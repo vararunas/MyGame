@@ -1,16 +1,2 @@
-const dots = document.querySelectorAll('.city-dot');
-const nameEl = document.getElementById('cityName');
-const populationEl = document.getElementById('population');
-const input = document.getElementById('cityInput');
-const start = document.getElementById('startButton');
-
-dots.forEach(dot => {
-  dot.addEventListener('click', () => {
-    dots.forEach(d => d.classList.remove('selected'));
-    dot.classList.add('selected');
-    nameEl.textContent = dot.dataset.city;
-    populationEl.textContent = Number(dot.dataset.pop).toLocaleString('lt-LT');
-    input.value = dot.dataset.city;
-    start.disabled = false;
-  });
-});
+const dots=document.querySelectorAll('.city-dot'),nameEl=document.getElementById('cityName'),populationEl=document.getElementById('population'),input=document.getElementById('cityInput'),start=document.getElementById('startButton'),tooltip=document.getElementById('mapTooltip'),map=document.getElementById('map');
+dots.forEach(dot=>{const show=()=>{tooltip.innerHTML='<strong>'+dot.dataset.city+'</strong><span>'+Number(dot.dataset.pop).toLocaleString('lt-LT')+' gyv.</span>';const m=dot.closest('.city-marker');tooltip.style.left=m.style.left;tooltip.style.top=m.style.top;tooltip.classList.add('visible')};dot.addEventListener('mouseenter',show);dot.addEventListener('focus',show);dot.addEventListener('mouseleave',()=>tooltip.classList.remove('visible'));dot.addEventListener('blur',()=>tooltip.classList.remove('visible'));dot.addEventListener('click',()=>{dots.forEach(d=>d.classList.remove('selected'));dot.classList.add('selected');nameEl.textContent=dot.dataset.city;populationEl.textContent=Number(dot.dataset.pop).toLocaleString('lt-LT');input.value=dot.dataset.city;start.disabled=false})});
