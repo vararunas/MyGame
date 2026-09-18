@@ -6,9 +6,12 @@ CREATE TABLE IF NOT EXISTS economic_parameters (
  UNIQUE KEY uq_country_parameter(country_id,parameter_key), CONSTRAINT fk_parameter_country FOREIGN KEY(country_id) REFERENCES countries(id)
 );
 CREATE TABLE IF NOT EXISTS economic_parameter_history (
- id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, parameter_id BIGINT UNSIGNED NOT NULL, old_value DECIMAL(14,4) NOT NULL, new_value DECIMAL(14,4) NOT NULL, changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, parameter_id BIGINT UNSIGNED NOT NULL, old_value DECIMAL(14,4) NOT NULL, new_value DECIMAL(14,4) NOT NULL,
+ effective_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  CONSTRAINT fk_history_parameter FOREIGN KEY(parameter_id) REFERENCES economic_parameters(id)
 );
+ALTER TABLE economic_parameter_history ADD COLUMN IF NOT EXISTS effective_from DATETIME NULL AFTER new_value;
+UPDATE economic_parameter_history SET effective_from=changed_at WHERE effective_from IS NULL;
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
