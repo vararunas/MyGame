@@ -47,6 +47,57 @@ CREATE TABLE IF NOT EXISTS bank_loan_products (
 ALTER TABLE banks CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE bank_loan_products CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS companies (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ country_id INT UNSIGNED NOT NULL,
+ name VARCHAR(150) NOT NULL,
+ cash DECIMAL(16,2) NOT NULL DEFAULT 0,
+ assets DECIMAL(16,2) NOT NULL DEFAULT 0,
+ liabilities DECIMAL(16,2) NOT NULL DEFAULT 0,
+ monthly_revenue DECIMAL(16,2) NOT NULL DEFAULT 0,
+ monthly_profit DECIMAL(16,2) NOT NULL DEFAULT 0,
+ age_months INT UNSIGNED NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_company_country FOREIGN KEY(country_id) REFERENCES countries(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS loan_applications (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ bank_id INT UNSIGNED NOT NULL,
+ loan_product_id INT UNSIGNED NULL,
+ requested_amount DECIMAL(14,2) NOT NULL,
+ requested_term_months SMALLINT UNSIGNED NOT NULL,
+ equity_percent DECIMAL(8,2) NOT NULL,
+ risk_score DECIMAL(8,2) NOT NULL,
+ risk_margin DECIMAL(8,4) NOT NULL,
+ offered_interest_rate DECIMAL(8,4) NOT NULL,
+ status ENUM('pending','approved','rejected','accepted','cancelled') NOT NULL DEFAULT 'pending',
+ decision_reason VARCHAR(255) NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ decided_at DATETIME NULL,
+ CONSTRAINT fk_loan_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_loan_bank FOREIGN KEY(bank_id) REFERENCES banks(id),
+ CONSTRAINT fk_loan_product FOREIGN KEY(loan_product_id) REFERENCES bank_loan_products(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_loans (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ application_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ company_id BIGINT UNSIGNED NOT NULL,
+ bank_id INT UNSIGNED NOT NULL,
+ principal DECIMAL(14,2) NOT NULL,
+ outstanding_principal DECIMAL(14,2) NOT NULL,
+ annual_interest_rate DECIMAL(8,4) NOT NULL,
+ term_months SMALLINT UNSIGNED NOT NULL,
+ monthly_payment DECIMAL(14,2) NOT NULL,
+ started_at DATETIME NOT NULL,
+ next_payment_at DATETIME NOT NULL,
+ status ENUM('active','paid','defaulted') NOT NULL DEFAULT 'active',
+ CONSTRAINT fk_company_loan_application FOREIGN KEY(application_id) REFERENCES loan_applications(id),
+ CONSTRAINT fk_company_loan_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_company_loan_bank FOREIGN KEY(bank_id) REFERENCES banks(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
