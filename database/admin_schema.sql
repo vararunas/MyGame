@@ -129,6 +129,9 @@ CREATE TABLE IF NOT EXISTS company_loans (
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND parameter_key='business_loan';
+UPDATE company_bank_accounts a JOIN banks b ON b.id=a.bank_id
+SET a.account_number=CONCAT('LT',LPAD(10+(a.company_id MOD 89),2,'0'),LEFT(UPPER(b.code),2),LPAD(a.bank_id,4,'0'),LPAD(a.company_id,8,'0'))
+WHERE CHAR_LENGTH(a.account_number)>20;
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
 (@lt,'economy','inflation','Infliacija',2.8,'%'),
 (@lt,'economy','gdp_growth','BVP augimas',2.0,'%'),
