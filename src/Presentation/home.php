@@ -1,19 +1,9 @@
-<!doctype html>
-<html lang="lt">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?= htmlspecialchars($config['name']) ?> – pasirink miestą</title><link rel="stylesheet" href="assets/app.css"></head>
-<body><main class="page"><header><span class="eyebrow">MYGAME • LIETUVA</span><h1>Kur pradėsi savo verslą?</h1>
-<p>Pasirink miestą. Didesnė rinka vėliau reikš daugiau klientų, bet ir didesnę konkurenciją bei sąnaudas.</p></header>
-<section class="layout"><div class="map-card"><div class="map" id="map">
-<svg class="country" viewBox="0 0 1000 650" aria-label="Lietuvos žemėlapis"><path d="M54 344 L82 278 L113 205 L161 143 L235 124 L302 78 L392 94 L475 58 L568 82 L647 62 L744 105 L834 103 L907 157 L928 237 L891 307 L922 382 L870 455 L799 476 L742 548 L650 563 L575 608 L480 579 L400 603 L321 558 L233 570 L170 514 L109 489 L87 409 Z"/></svg>
-<div class="map-tooltip" id="mapTooltip"></div>
-<?php foreach ($cities as $city): $size=max(8,min(24,7+log(max($city->population,5000)/5000,1.8))); $major=$city->population>=80000; ?>
-<div class="city-marker" style="--x:<?= $city->x ?>%;--y:<?= $city->y ?>%">
-<button class="city-dot" style="width:<?= $size ?>px;height:<?= $size ?>px" data-city="<?= htmlspecialchars($city->name) ?>" data-pop="<?= $city->population ?>" aria-label="<?= htmlspecialchars($city->name) ?>"></button>
-<?php if($major): ?><span class="city-label"><?= htmlspecialchars($city->name) ?></span><?php endif; ?></div>
-<?php endforeach; ?></div></div>
-<aside class="panel"><div class="panel-label">STARTO MIESTAS</div><h2 id="cityName"><?= $selected?htmlspecialchars($selected):'Pasirink miestą žemėlapyje' ?></h2>
-<div class="stat"><span>Gyventojai</span><strong id="population">—</strong></div><div class="stat"><span>Minimalus dydis</span><strong>5 000</strong></div>
-<form method="post" id="cityForm"><input type="hidden" name="city" id="cityInput"><button class="start" id="startButton" disabled>Pradėti verslą šiame mieste</button></form>
-<?php if($selected): ?><p class="saved">Pasirinkta: <strong><?= htmlspecialchars($selected) ?></strong></p><?php endif; ?></aside></section></main>
-<script src="assets/app.js"></script></body></html>
+<!doctype html><html lang="lt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?= htmlspecialchars($config['name']) ?> – naujas žaidimas</title><link rel="stylesheet" href="assets/app.css"></head><body>
+<div class="topbar"><div><b>MYGAME</b><span>Verslo simuliatorius</span></div><div class="topstats"><span>NAUJAS ŽAIDIMAS</span><strong>🇱🇹 Lietuva</strong></div></div>
+<main class="page"><div class="intro"><div><span class="eyebrow">1 ŽINGSNIS IŠ 3</span><h1>Pasirink starto miestą</h1><p>Miestas nulems tavo pirmąją rinką. Pasirink žemėlapyje arba miestų sąraše.</p></div><div class="rule">Miestai nuo <strong>5 000</strong> gyventojų</div></div>
+<section class="game-layout">
+<div class="card map-card"><div class="card-head"><div><small>LIETUVOS RINKA</small><strong>Miestai</strong></div><div class="legend"><i></i> Gyventojų skaičius</div></div><div class="map" id="map"><svg class="country" viewBox="0 0 1000 650"><path d="M54 344 L82 278 L113 205 L161 143 L235 124 L302 78 L392 94 L475 58 L568 82 L647 62 L744 105 L834 103 L907 157 L928 237 L891 307 L922 382 L870 455 L799 476 L742 548 L650 563 L575 608 L480 579 L400 603 L321 558 L233 570 L170 514 L109 489 L87 409 Z"/></svg><div class="map-tooltip" id="mapTooltip"></div>
+<?php foreach($cities as $city): $size=max(8,min(24,7+log(max($city->population,5000)/5000,1.8))); $major=$city->population>=80000; ?><div class="city-marker" style="--x:<?= $city->x ?>%;--y:<?= $city->y ?>%"><button class="city-dot" style="width:<?= $size ?>px;height:<?= $size ?>px" data-city="<?= htmlspecialchars($city->name) ?>" data-pop="<?= $city->population ?>"></button><?php if($major): ?><span class="city-label"><?= htmlspecialchars($city->name) ?></span><?php endif; ?></div><?php endforeach; ?></div></div>
+<div class="card city-list"><div class="card-head"><div><small>MIESTŲ SĄRAŠAS</small><strong>Pasirinkimas</strong></div></div><input id="citySearch" class="search" placeholder="Ieškoti miesto..." autocomplete="off"><div class="cities" id="cityList"><?php foreach($cities as $city): ?><button class="city-row" data-city="<?= htmlspecialchars($city->name) ?>" data-pop="<?= $city->population ?>"><span><b><?= htmlspecialchars($city->name) ?></b><small><?= number_format($city->population,0,',',' ') ?> gyv.</small></span><em>›</em></button><?php endforeach; ?></div></div>
+<aside class="card panel"><small>PASIRINKTAS MIESTAS</small><h2 id="cityName">Nepasirinkta</h2><div class="market-tag" id="marketTag">Pasirink miestą</div><div class="stats"><div><span>Gyventojai</span><strong id="population">—</strong></div><div><span>Rinkos dydis</span><strong id="marketSize">—</strong></div><div><span>Konkurencija</span><strong class="muted">Bus skaičiuojama</strong></div><div><span>Pradinės sąnaudos</span><strong class="muted">Bus skaičiuojama</strong></div></div><form method="post"><input type="hidden" name="city" id="cityInput"><button class="start" id="startButton" disabled>Tęsti su šiuo miestu <span>→</span></button></form><p class="hint">Kitame žingsnyje kursime tavo įmonę.</p></aside>
+</section></main><script src="assets/app.js"></script></body></html>
