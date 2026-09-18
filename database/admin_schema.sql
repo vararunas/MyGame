@@ -61,6 +61,34 @@ CREATE TABLE IF NOT EXISTS companies (
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  CONSTRAINT fk_company_country FOREIGN KEY(country_id) REFERENCES countries(id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_bank_accounts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ bank_id INT UNSIGNED NOT NULL,
+ account_number VARCHAR(34) NOT NULL UNIQUE,
+ currency CHAR(3) NOT NULL DEFAULT 'EUR',
+ balance DECIMAL(16,2) NOT NULL DEFAULT 0,
+ is_primary TINYINT(1) NOT NULL DEFAULT 0,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_account_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_account_bank FOREIGN KEY(bank_id) REFERENCES banks(id),
+ INDEX idx_account_company(company_id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS bank_account_transactions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ account_id BIGINT UNSIGNED NOT NULL,
+ transaction_type VARCHAR(40) NOT NULL,
+ amount DECIMAL(16,2) NOT NULL,
+ balance_after DECIMAL(16,2) NOT NULL,
+ reference_type VARCHAR(40) NULL,
+ reference_id BIGINT UNSIGNED NULL,
+ description VARCHAR(255) NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_transaction_account FOREIGN KEY(account_id) REFERENCES company_bank_accounts(id),
+ INDEX idx_transaction_account_date(account_id,created_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS loan_applications (
  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
  company_id BIGINT UNSIGNED NOT NULL,
