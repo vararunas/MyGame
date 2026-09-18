@@ -35,10 +35,10 @@ final class DatabaseEconomyRepository {
  public function banks(): array {
   $countryId=$this->countryId();
   $params=[];foreach($this->section('banking') as $p)$params[$p->key]=$p->value;
-  $base=(float)($params['base_rate']??0);$stateMargin=(float)($params['business_loan']??0);
+  $base=(float)($params['base_rate']??0);
   $s=$this->pdo->prepare('SELECT b.id,b.name,b.code,b.capital,b.liquidity_index,b.risk_appetite,b.loan_margin,b.deposit_margin,b.is_active,p.name product_name,p.min_amount,p.max_amount,p.max_term_months,p.margin product_margin,p.min_equity_percent FROM banks b LEFT JOIN bank_loan_products p ON p.bank_id=b.id AND p.is_active=1 WHERE b.country_id=? ORDER BY b.id');
   $s->execute([$countryId]);$rows=$s->fetchAll();
-  foreach($rows as &$r){$r['effective_loan_rate']=$base+$stateMargin+(float)$r['loan_margin']+(float)($r['product_margin']??0);$r['effective_deposit_rate']=max(0,(float)($params['deposit_rate']??0)+(float)$r['deposit_margin']);}
+  foreach($rows as &$r){$r['effective_loan_rate']=$base+(float)$r['loan_margin']+(float)($r['product_margin']??0);$r['effective_deposit_rate']=max(0,(float)($params['deposit_rate']??0)+(float)$r['deposit_margin']);}
   unset($r);return $rows;
  }
  public function history(string $section,int $limit=30): array {
