@@ -32,6 +32,15 @@ final class DatabaseEconomyRepository {
    $this->pdo->commit();
   }catch(\Throwable $e){if($this->pdo->inTransaction())$this->pdo->rollBack();throw $e;}
  }
+ public function banks(): array {
+  $countryId=$this->countryId();
+  $params=[];foreach($this->section('banking') as $p)$params[$p->key]=$p->value;
+  $base=(float)($params['base_rate']??0);$stateMargin=(float)($params['business_loan']??0);
+  $s=$this->pdo->prepare('SELECT b.id,b.name,b.code,b.capital,b.liquidity_index,b.risk_appetite,b.loan_margin,b.deposit_margin,b.is_active,p.name product_name,p.min_amount,p.max_amount,p.max_term_months,p.margin product_margin,p.min_equity_percent FROM banks b LEFT JOIN bank_loan_products p ON p.bank_id=b.id AND p.is_active=1 WHERE b.country_id=? ORDER BY b.id');
+  $s->execute([$countryId]);$rows=$s->fetchAll();
+  foreach($rows as &$r){$r['effective_loan_rate']=$base+$stateMargin+(float)$r['loan_margin']+(float)($r['product_margin']??0);$r['effective_deposit_rate']=max(0,(float)($params['deposit_rate']??0)+(float)$r['deposit_margin']);}
+  unset($r);return $rows;
+ }
  public function history(string $section,int $limit=30): array {
   $limit=max(1,min(100,$limit));
   $sql='SELECT p.label,p.unit,h.old_value,h.new_value,h.effective_from,h.changed_at FROM economic_parameter_history h JOIN economic_parameters p ON p.id=h.parameter_id WHERE p.country_id=? AND p.section=? ORDER BY h.changed_at DESC,h.id DESC LIMIT '.$limit;
