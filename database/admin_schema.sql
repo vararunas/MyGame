@@ -18,6 +18,35 @@ ALTER TABLE economic_parameter_history CONVERT TO CHARACTER SET utf8mb4 COLLATE 
 
 ALTER TABLE economic_parameter_history ADD COLUMN IF NOT EXISTS effective_from DATETIME NULL AFTER new_value;
 UPDATE economic_parameter_history SET effective_from=changed_at WHERE effective_from IS NULL;
+CREATE TABLE IF NOT EXISTS banks (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ country_id INT UNSIGNED NOT NULL,
+ name VARCHAR(120) NOT NULL,
+ code VARCHAR(30) NOT NULL UNIQUE,
+ capital DECIMAL(16,2) NOT NULL DEFAULT 0,
+ liquidity_index DECIMAL(8,2) NOT NULL DEFAULT 100,
+ risk_appetite DECIMAL(8,2) NOT NULL DEFAULT 100,
+ loan_margin DECIMAL(8,4) NOT NULL DEFAULT 2.5,
+ deposit_margin DECIMAL(8,4) NOT NULL DEFAULT 0,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_bank_country FOREIGN KEY(country_id) REFERENCES countries(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS bank_loan_products (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ bank_id INT UNSIGNED NOT NULL,
+ name VARCHAR(120) NOT NULL,
+ min_amount DECIMAL(14,2) NOT NULL DEFAULT 1000,
+ max_amount DECIMAL(14,2) NOT NULL DEFAULT 100000,
+ max_term_months SMALLINT UNSIGNED NOT NULL DEFAULT 60,
+ margin DECIMAL(8,4) NOT NULL DEFAULT 0,
+ min_equity_percent DECIMAL(8,2) NOT NULL DEFAULT 20,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
+ CONSTRAINT fk_loan_product_bank FOREIGN KEY(bank_id) REFERENCES banks(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE banks CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE bank_loan_products CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
@@ -76,3 +105,13 @@ INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,uni
 (@lt,'population','working_age_share','Darbingo amžiaus gyventojai',64,'%'),
 (@lt,'population','urbanisation','Urbanizacija',68,'%')
 ON DUPLICATE KEY UPDATE label=VALUES(label),unit=VALUES(unit);
+
+SET @lt=(SELECT id FROM countries WHERE code='LT');
+INSERT INTO banks(country_id,name,code,capital,liquidity_index,risk_appetite,loan_margin,deposit_margin,is_active) VALUES
+(@lt,'Verslo Bankas','VB',250000000,100,100,2.20,0.20,1),
+(@lt,'Kapitalo Bankas','KB',180000000,95,85,2.80,0.35,1),
+(@lt,'Augimo Bankas','AB',120000000,105,120,3.10,0.10,1)
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+INSERT INTO bank_loan_products(bank_id,name,min_amount,max_amount,max_term_months,margin,min_equity_percent,is_active)
+SELECT b.id,'Verslo paskola',5000,250000,120,0,20,1 FROM banks b
+WHERE b.country_id=@lt AND NOT EXISTS(SELECT 1 FROM bank_loan_products p WHERE p.bank_id=b.id AND p.name='Verslo paskola');
