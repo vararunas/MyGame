@@ -69,7 +69,6 @@ INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,uni
 (@lt,'water','water_price_volatility','Leistinas kainos svyravimas',5,'%'),
 (@lt,'water','automatic_water_pricing','Automatinis kainų valdymas',0,'0/1'),
 (@lt,'banking','base_rate','Bazinė palūkanų norma',3.5,'%'),
-(@lt,'banking','business_loan','Verslo paskolos marža nuo',2.4,'%'),
 (@lt,'banking','deposit_rate','Indėlių palūkanos',2.0,'%'),
 (@lt,'banking','max_loan_term','Maksimalus verslo paskolos terminas',10,'metai'),
 (@lt,'banking','min_equity','Minimalus nuosavas kapitalas paskolai',20,'%'),
