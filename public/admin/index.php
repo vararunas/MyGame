@@ -6,14 +6,15 @@ $admin=require __DIR__.'/../../config/admin.php';
 use MyGame\Infrastructure\Database\Connection;
 use MyGame\Infrastructure\Economy\DatabaseEconomyRepository;
 $section=$_GET['section']??'economy';if(!isset($admin['sections'][$section]))$section='economy';
-$error=null;$saved=false;
+$error=null;$saved=false;$history=[];$effectiveFrom=date('Y-m-d');
 try{
  $repo=new DatabaseEconomyRepository(Connection::make());
  if($_SERVER['REQUEST_METHOD']==='POST'){
   if(!hash_equals($_SESSION['csrf']??'',(string)($_POST['csrf']??'')))throw new RuntimeException('Neteisinga saugos užklausa. Perkrauk puslapį.');
-  $repo->updateSection($section,$_POST['values']??[]);$saved=true;
+  $effectiveFrom=(string)($_POST['effective_from']??date('Y-m-d'));
+  $repo->updateSection($section,$_POST['values']??[],$effectiveFrom);$saved=true;
  }
- $parameters=$repo->section($section);
+ $parameters=$repo->section($section);$history=$repo->history($section);
 }catch(Throwable $e){$error=$e->getMessage();$parameters=[];}
 $_SESSION['csrf']??=bin2hex(random_bytes(24));$csrf=$_SESSION['csrf'];
 require __DIR__.'/../../src/Presentation/admin/country.php';
