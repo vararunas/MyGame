@@ -16,7 +16,13 @@ INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLIC
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
 (@lt,'economy','inflation','Infliacija',2.8,'%'),
-(@lt,'energy','electricity','Elektra',0.21,'€/kWh'),(@lt,'energy','gas','Dujos',0.09,'€/kWh'),
+(@lt,'energy','electricity','Elektros bazinė kaina',0.21,'€/kWh'),
+(@lt,'energy','gas','Dujų bazinė kaina',0.09,'€/kWh'),
+(@lt,'energy','electricity_capacity','Elektros tiekimo pajėgumas',100,'ind.'),
+(@lt,'energy','gas_capacity','Dujų tiekimo pajėgumas',100,'ind.'),
+(@lt,'energy','price_volatility','Leistinas kainos svyravimas',10,'%'),
+(@lt,'energy','supply_stability','Tiekimo stabilumas',100,'%'),
+(@lt,'energy','automatic_pricing','Automatinis kainų valdymas',0,'0/1'),
 (@lt,'water','water','Vanduo',1.20,'€/m³'),(@lt,'water','sewerage','Nuotekos',1.45,'€/m³'),
 (@lt,'banking','base_rate','Bazinė palūkanų norma',3.5,'%'),(@lt,'banking','business_loan','Verslo paskolos nuo',5.9,'%'),
 (@lt,'taxes','vat','PVM',21,'%'),(@lt,'taxes','profit_tax','Pelno mokestis',17,'%'),
