@@ -602,3 +602,25 @@ INSERT INTO economy_sectors(code,name,balance,sector_type) VALUES
 ('FOREIGN','Užsienio sektorius',5000000000,'foreign')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 UPDATE suppliers SET supplier_type=IF(country_code='LT','domestic','foreign');
+
+
+ALTER TABLE company_utility_contracts ADD COLUMN IF NOT EXISTS provider_type ENUM('state','company') NOT NULL DEFAULT 'state';
+ALTER TABLE company_utility_contracts ADD COLUMN IF NOT EXISTS provider_company_id BIGINT UNSIGNED NULL;
+ALTER TABLE payroll_ledger ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER gross_amount;
+ALTER TABLE payroll_ledger ADD COLUMN IF NOT EXISTS net_amount DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER tax_amount;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS input_vat DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER total_cost;
+ALTER TABLE state_expenses ADD COLUMN IF NOT EXISTS recipient_type ENUM('company','households','foreign') NOT NULL DEFAULT 'company' AFTER institution_id;
+ALTER TABLE state_expenses ADD COLUMN IF NOT EXISTS game_date DATE NULL AFTER amount;
+CREATE TABLE IF NOT EXISTS company_payment_arrears (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ arrears_type ENUM('payroll','rent','utilities','marketing') NOT NULL,
+ reference_id BIGINT UNSIGNED NULL,
+ period CHAR(7) NOT NULL,
+ amount DECIMAL(16,2) NOT NULL,
+ status ENUM('due','paid') NOT NULL DEFAULT 'due',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ paid_at DATETIME NULL,
+ CONSTRAINT fk_arrears_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ INDEX idx_arrears_company(company_id,status)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
