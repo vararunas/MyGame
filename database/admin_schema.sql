@@ -441,3 +441,111 @@ ON DUPLICATE KEY UPDATE name=VALUES(name);
 INSERT INTO bank_loan_products(bank_id,name,min_amount,max_amount,max_term_months,margin,min_equity_percent,is_active)
 SELECT b.id,'Verslo paskola',5000,250000,120,0,20,1 FROM banks b
 WHERE b.country_id=@lt AND NOT EXISTS(SELECT 1 FROM bank_loan_products p WHERE p.bank_id=b.id AND p.name='Verslo paskola');
+
+
+CREATE TABLE IF NOT EXISTS job_roles (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ code VARCHAR(50) NOT NULL UNIQUE,
+ name VARCHAR(100) NOT NULL,
+ base_salary DECIMAL(14,2) NOT NULL,
+ productivity DECIMAL(8,2) NOT NULL DEFAULT 100,
+ automation_type VARCHAR(50) NULL
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_employees (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ role_id INT UNSIGNED NOT NULL,
+ full_name VARCHAR(120) NOT NULL,
+ salary DECIMAL(14,2) NOT NULL,
+ skill DECIMAL(8,2) NOT NULL DEFAULT 70,
+ status ENUM('active','dismissed') NOT NULL DEFAULT 'active',
+ hired_at DATE NOT NULL,
+ CONSTRAINT fk_employee_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_employee_role FOREIGN KEY(role_id) REFERENCES job_roles(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS products (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ sku VARCHAR(50) NOT NULL UNIQUE,
+ name VARCHAR(160) NOT NULL,
+ industry VARCHAR(60) NOT NULL,
+ base_cost DECIMAL(14,2) NOT NULL,
+ base_price DECIMAL(14,2) NOT NULL,
+ unit_volume DECIMAL(10,3) NOT NULL DEFAULT 1
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_inventory (
+ company_id BIGINT UNSIGNED NOT NULL,
+ product_id BIGINT UNSIGNED NOT NULL,
+ quantity DECIMAL(14,2) NOT NULL DEFAULT 0,
+ average_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+ sale_price DECIMAL(14,2) NOT NULL DEFAULT 0,
+ PRIMARY KEY(company_id,product_id),
+ CONSTRAINT fk_inventory_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_inventory_product FOREIGN KEY(product_id) REFERENCES products(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS suppliers (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(150) NOT NULL,
+ country_code CHAR(2) NOT NULL,
+ industry VARCHAR(60) NOT NULL,
+ price_factor DECIMAL(8,3) NOT NULL DEFAULT 1,
+ delivery_days SMALLINT UNSIGNED NOT NULL DEFAULT 3,
+ is_active TINYINT(1) NOT NULL DEFAULT 1
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS purchase_orders (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ supplier_id BIGINT UNSIGNED NOT NULL,
+ product_id BIGINT UNSIGNED NOT NULL,
+ quantity DECIMAL(14,2) NOT NULL,
+ unit_cost DECIMAL(14,2) NOT NULL,
+ transport_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+ customs_cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+ total_cost DECIMAL(16,2) NOT NULL,
+ ordered_at DATE NOT NULL,
+ arrives_at DATE NOT NULL,
+ status ENUM('ordered','delivered','cancelled') NOT NULL DEFAULT 'ordered',
+ CONSTRAINT fk_po_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_po_supplier FOREIGN KEY(supplier_id) REFERENCES suppliers(id),
+ CONSTRAINT fk_po_product FOREIGN KEY(product_id) REFERENCES products(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_marketing (
+ company_id BIGINT UNSIGNED PRIMARY KEY,
+ monthly_budget DECIMAL(14,2) NOT NULL DEFAULT 0,
+ brand_awareness DECIMAL(8,2) NOT NULL DEFAULT 50,
+ reputation DECIMAL(8,2) NOT NULL DEFAULT 70,
+ CONSTRAINT fk_marketing_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS sales_ledger (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ product_id BIGINT UNSIGNED NULL,
+ period CHAR(7) NOT NULL,
+ quantity DECIMAL(14,2) NOT NULL DEFAULT 0,
+ revenue DECIMAL(16,2) NOT NULL DEFAULT 0,
+ cost DECIMAL(16,2) NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_sales_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_sales_product FOREIGN KEY(product_id) REFERENCES products(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS state_expenses (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ institution_id INT UNSIGNED NOT NULL,
+ recipient_company_id BIGINT UNSIGNED NULL,
+ expense_type VARCHAR(60) NOT NULL,
+ description VARCHAR(200) NOT NULL,
+ amount DECIMAL(16,2) NOT NULL,
+ paid_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_expense_institution FOREIGN KEY(institution_id) REFERENCES state_institutions(id),
+ CONSTRAINT fk_expense_company FOREIGN KEY(recipient_company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+INSERT INTO job_roles(code,name,base_salary,productivity,automation_type) VALUES
+('seller','Pardavėjas',1600,100,NULL),('warehouse','Sandėlininkas',1700,100,NULL),('driver','Vairuotojas',2100,100,NULL),('accountant','Buhalteris',2300,100,'accounting'),('manager','Vadybininkas',2400,110,NULL),('marketing','Marketingo specialistas',2300,105,NULL),('production','Gamybos darbuotojas',1800,100,NULL)
+ON DUPLICATE KEY UPDATE name=VALUES(name),base_salary=VALUES(base_salary),productivity=VALUES(productivity),automation_type=VALUES(automation_type);
+INSERT INTO products(sku,name,industry,base_cost,base_price) VALUES
+('RET-001','Kasdienė prekė','retail',5,9),('LOG-001','Logistikos paslauga','logistics',40,75),('MAN-001','Gamybos produktas','manufacturing',20,38),('SRV-001','Verslo paslauga','services',30,60)
+ON DUPLICATE KEY UPDATE name=VALUES(name),base_cost=VALUES(base_cost),base_price=VALUES(base_price);
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
+SELECT 'Baltic Supply','LT','retail',1,2 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Baltic Supply');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
+SELECT 'Euro Wholesale','DE','retail',0.88,6 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Euro Wholesale');
