@@ -9,15 +9,17 @@ $_SESSION['csrf']??=bin2hex(random_bytes(24));$csrf=$_SESSION['csrf'];
 $d=['company'=>['name'=>'Įmonė'],'reg'=>null,'emp'=>null,'props'=>[],'utils'=>[],'trade'=>null,'obligations'=>[]];
 $costs=['rent'=>0,'utilities'=>0,'payroll'=>0,'payroll_tax'=>0,'total'=>0];
 try{
- $repo=new DatabaseStateRepository(Connection::make());$companyId=1;$repo->register($companyId);
+ $db=Connection::make();$repo=new DatabaseStateRepository($db);$companyId=(int)($_SESSION['company_id']??1);$repo->register($companyId);$engine=new \MyGame\Infrastructure\Economy\GameEconomyEngine($db);$engine->refreshObligations($companyId);$clock=$engine->clock();
  if($_SERVER['REQUEST_METHOD']==='POST'){
   if(!hash_equals($csrf,(string)($_POST['csrf']??'')))throw new RuntimeException('Neteisinga saugos užklausa.');
   $a=(string)($_POST['action']??'');
-  if($a==='property'){$repo->addProperty($companyId,(string)($_POST['type']??''),trim((string)($_POST['city']??'')),(float)str_replace(',','.',(string)($_POST['area']??0)));$notice='Patalpos išnuomotos.';}
+  if($a==='advance_day'){$engine->advance((int)($_POST['days']??1));$engine->refreshObligations($companyId);$notice='Žaidimo laikas pasuktas pirmyn.';}
+  elseif($a==='pay_obligation'){$engine->payObligation($companyId,(int)($_POST['obligation_id']??0));$notice='Įsipareigojimas apmokėtas.';}
+  elseif($a==='property'){$repo->addProperty($companyId,(string)($_POST['type']??''),trim((string)($_POST['city']??'')),(float)str_replace(',','.',(string)($_POST['area']??0)));$notice='Patalpos išnuomotos.';}
   elseif($a==='employment'){$repo->setEmployees($companyId,(int)($_POST['employees']??0),(float)str_replace(',','.',(string)($_POST['salary']??0)));$notice='Darbo duomenys atnaujinti.';}
   elseif($a==='utility'){$repo->addUtility($companyId,(string)($_POST['utility']??''),(float)str_replace(',','.',(string)($_POST['usage']??0)));$notice='Komunalinė sutartis atnaujinta.';}
   elseif($a==='trade'){$repo->toggleTrade($companyId,isset($_POST['import']),isset($_POST['export']));$notice='Prekybos leidimai atnaujinti.';}
  }
- $d=$repo->dashboard($companyId);$costs=$repo->monthlyEstimate($companyId);
+ $d=$repo->dashboard($companyId);$costs=$repo->monthlyEstimate($companyId);$clock=$engine->clock();
 }catch(Throwable $e){$error=$e->getMessage();}
 require __DIR__.'/../src/Presentation/state.php';
