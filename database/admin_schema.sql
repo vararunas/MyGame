@@ -549,3 +549,56 @@ INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
 SELECT 'Baltic Supply','LT','retail',1,2 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Baltic Supply');
 INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
 SELECT 'Euro Wholesale','DE','retail',0.88,6 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Euro Wholesale');
+
+
+ALTER TABLE property_market ADD COLUMN IF NOT EXISTS owner_type ENUM('state','company') NOT NULL DEFAULT 'state' AFTER id;
+ALTER TABLE property_market ADD COLUMN IF NOT EXISTS owner_company_id BIGINT UNSIGNED NULL AFTER owner_type;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS supplier_type ENUM('domestic','foreign') NOT NULL DEFAULT 'domestic' AFTER id;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS company_id BIGINT UNSIGNED NULL AFTER supplier_type;
+ALTER TABLE company_monthly_cycles ADD COLUMN IF NOT EXISTS stock_cost DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER revenue;
+ALTER TABLE company_monthly_cycles ADD COLUMN IF NOT EXISTS marketing_cost DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER utility_cost;
+ALTER TABLE company_monthly_cycles ADD COLUMN IF NOT EXISTS input_vat DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER vat_due;
+ALTER TABLE company_monthly_cycles ADD COLUMN IF NOT EXISTS taxable_result DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER input_vat;
+
+CREATE TABLE IF NOT EXISTS economy_sectors (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ code VARCHAR(40) NOT NULL UNIQUE,
+ name VARCHAR(120) NOT NULL,
+ balance DECIMAL(18,2) NOT NULL DEFAULT 0,
+ sector_type ENUM('households','foreign') NOT NULL
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS economy_sector_transactions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ sector_id INT UNSIGNED NOT NULL,
+ company_id BIGINT UNSIGNED NULL,
+ transaction_type VARCHAR(50) NOT NULL,
+ amount DECIMAL(18,2) NOT NULL,
+ balance_after DECIMAL(18,2) NOT NULL,
+ description VARCHAR(255) NOT NULL,
+ game_date DATE NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_sector_tx_sector FOREIGN KEY(sector_id) REFERENCES economy_sectors(id),
+ CONSTRAINT fk_sector_tx_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_tax_accounts (
+ company_id BIGINT UNSIGNED PRIMARY KEY,
+ vat_credit DECIMAL(16,2) NOT NULL DEFAULT 0,
+ tax_loss_carryforward DECIMAL(16,2) NOT NULL DEFAULT 0,
+ CONSTRAINT fk_tax_account_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS payroll_ledger (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ employee_id BIGINT UNSIGNED NULL,
+ period CHAR(7) NOT NULL,
+ gross_amount DECIMAL(16,2) NOT NULL,
+ status ENUM('due','paid') NOT NULL DEFAULT 'due',
+ paid_at DATE NULL,
+ CONSTRAINT fk_payroll_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ CONSTRAINT fk_payroll_employee FOREIGN KEY(employee_id) REFERENCES company_employees(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+INSERT INTO economy_sectors(code,name,balance,sector_type) VALUES
+('HOUSEHOLDS','Gyventojų sektorius',2500000000,'households'),
+('FOREIGN','Užsienio sektorius',5000000000,'foreign')
+ON DUPLICATE KEY UPDATE name=VALUES(name);
+UPDATE suppliers SET supplier_type=IF(country_code='LT','domestic','foreign');
