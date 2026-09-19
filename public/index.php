@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['city'])) {
     $allowed = array_column(array_map(fn($c) => ['name'=>$c->name], $cities), 'name');
     if (in_array($_POST['city'], $allowed, true)) {
         $_SESSION['start_city'] = $_POST['city'];
+        header('Location: company-create.php'); exit;
     }
 }
 
