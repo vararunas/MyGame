@@ -633,3 +633,17 @@ ALTER TABLE bank_account_transactions ADD COLUMN IF NOT EXISTS game_date DATE NU
 ALTER TABLE state_bank_transactions ADD COLUMN IF NOT EXISTS game_date DATE NULL;
 UPDATE bank_account_transactions SET game_date=DATE(created_at) WHERE game_date IS NULL;
 UPDATE state_bank_transactions SET game_date=DATE(created_at) WHERE game_date IS NULL;
+
+
+ALTER TABLE economy_sectors MODIFY COLUMN sector_type ENUM('households','foreign','business') NOT NULL;
+INSERT INTO economy_sectors(code,name,balance,sector_type) VALUES
+('DOMESTIC_BUSINESS','Lietuvos verslo tiekėjų sektorius',250000000,'business')
+ON DUPLICATE KEY UPDATE name=VALUES(name),sector_type=VALUES(sector_type);
+
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
+SELECT 'Lietuvos logistikos partneriai','LT','logistics',1,2 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Lietuvos logistikos partneriai');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
+SELECT 'Baltic Industrial Supply','LT','manufacturing',1,3 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Baltic Industrial Supply');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
+SELECT 'Verslo paslaugų tinklas','LT','services',1,1 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Verslo paslaugų tinklas');
+UPDATE suppliers SET supplier_type=IF(country_code='LT','domestic','foreign');
