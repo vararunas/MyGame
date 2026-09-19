@@ -126,6 +126,24 @@ CREATE TABLE IF NOT EXISTS company_loans (
  CONSTRAINT fk_company_loan_bank FOREIGN KEY(bank_id) REFERENCES banks(id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS loan_payments (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ loan_id BIGINT UNSIGNED NOT NULL,
+ installment_no SMALLINT UNSIGNED NOT NULL,
+ due_at DATETIME NOT NULL,
+ scheduled_amount DECIMAL(14,2) NOT NULL,
+ interest_amount DECIMAL(14,2) NOT NULL,
+ principal_amount DECIMAL(14,2) NOT NULL,
+ penalty_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+ paid_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+ paid_at DATETIME NULL,
+ status ENUM('waiting','due','late','paid') NOT NULL DEFAULT 'waiting',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_loan_installment(loan_id,installment_no),
+ CONSTRAINT fk_payment_loan FOREIGN KEY(loan_id) REFERENCES company_loans(id),
+ INDEX idx_payment_due(loan_id,due_at,status)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND parameter_key='business_loan';
