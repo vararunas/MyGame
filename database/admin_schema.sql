@@ -144,6 +144,69 @@ CREATE TABLE IF NOT EXISTS loan_payments (
  INDEX idx_payment_due(loan_id,due_at,status)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS company_registrations (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ registration_code VARCHAR(24) NOT NULL UNIQUE,
+ status ENUM('active','suspended','closed') NOT NULL DEFAULT 'active',
+ registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_registration_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_obligations (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ institution VARCHAR(40) NOT NULL,
+ obligation_type VARCHAR(60) NOT NULL,
+ description VARCHAR(180) NOT NULL,
+ amount DECIMAL(16,2) NOT NULL,
+ due_at DATETIME NOT NULL,
+ paid_at DATETIME NULL,
+ penalty_amount DECIMAL(16,2) NOT NULL DEFAULT 0,
+ status ENUM('pending','late','paid') NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_obligation_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ INDEX idx_obligation_due(company_id,due_at,status)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_utility_contracts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ utility_type ENUM('electricity','gas','water','sewerage') NOT NULL,
+ monthly_usage DECIMAL(14,3) NOT NULL DEFAULT 0,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
+ started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_company_utility(company_id,utility_type),
+ CONSTRAINT fk_utility_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_properties (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ property_type ENUM('office','shop','warehouse','factory') NOT NULL,
+ city VARCHAR(100) NOT NULL,
+ area_m2 DECIMAL(10,2) NOT NULL,
+ monthly_rent DECIMAL(14,2) NOT NULL,
+ status ENUM('active','ended') NOT NULL DEFAULT 'active',
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_property_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_employment (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ employees INT UNSIGNED NOT NULL DEFAULT 0,
+ average_salary DECIMAL(14,2) NOT NULL DEFAULT 0,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_employment_company(company_id),
+ CONSTRAINT fk_employment_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS company_trade_profiles (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ import_enabled TINYINT(1) NOT NULL DEFAULT 0,
+ export_enabled TINYINT(1) NOT NULL DEFAULT 0,
+ customs_debt DECIMAL(14,2) NOT NULL DEFAULT 0,
+ CONSTRAINT fk_trade_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND parameter_key='business_loan';
