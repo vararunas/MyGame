@@ -270,6 +270,44 @@ SELECT 'Kaunas','warehouse','Logistikos sandėlis',500,6.00,3000,0.65 WHERE (SEL
 INSERT INTO property_market(city,property_type,title,area_m2,rent_per_m2,monthly_rent,utility_factor)
 SELECT 'Klaipėda','factory','Gamybinės patalpos',900,7.00,6300,1.80 WHERE (SELECT COUNT(*) FROM property_market)<4;
 
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS company_type ENUM('player','ai') NOT NULL DEFAULT 'player' AFTER starting_capital;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS status ENUM('active','insolvent','bankrupt') NOT NULL DEFAULT 'active' AFTER company_type;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS credit_score SMALLINT UNSIGNED NOT NULL DEFAULT 700 AFTER status;
+
+CREATE TABLE IF NOT EXISTS ai_company_profiles (
+ company_id BIGINT UNSIGNED PRIMARY KEY,
+ strategy ENUM('cautious','balanced','growth') NOT NULL DEFAULT 'balanced',
+ target_employees INT UNSIGNED NOT NULL DEFAULT 3,
+ price_index DECIMAL(8,2) NOT NULL DEFAULT 100,
+ marketing_index DECIMAL(8,2) NOT NULL DEFAULT 100,
+ months_in_loss SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+ CONSTRAINT fk_ai_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS economy_snapshots (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ period CHAR(7) NOT NULL UNIQUE,
+ inflation DECIMAL(10,4) NOT NULL,
+ gdp_growth DECIMAL(10,4) NOT NULL,
+ unemployment DECIMAL(10,4) NOT NULL,
+ consumer_confidence DECIMAL(10,4) NOT NULL,
+ business_confidence DECIMAL(10,4) NOT NULL,
+ purchasing_power DECIMAL(10,4) NOT NULL,
+ property_index DECIMAL(10,4) NOT NULL,
+ active_companies INT UNSIGNED NOT NULL DEFAULT 0,
+ bankruptcies INT UNSIGNED NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+INSERT INTO market_demand(city,industry,demand_index,purchasing_power,population) VALUES
+('Vilnius','retail',112,108,607000),('Vilnius','services',110,108,607000),('Vilnius','logistics',104,108,607000),('Vilnius','manufacturing',101,108,607000),
+('Kaunas','retail',105,102,304000),('Kaunas','services',104,102,304000),('Kaunas','logistics',108,102,304000),('Kaunas','manufacturing',105,102,304000),
+('Klaipėda','retail',101,100,160000),('Klaipėda','services',100,100,160000),('Klaipėda','logistics',112,100,160000),('Klaipėda','manufacturing',106,100,160000),
+('Šiauliai','retail',96,94,112000),('Šiauliai','services',95,94,112000),('Šiauliai','logistics',99,94,112000),('Šiauliai','manufacturing',101,94,112000),
+('Panevėžys','retail',95,93,89000),('Panevėžys','services',94,93,89000),('Panevėžys','logistics',100,93,89000),('Panevėžys','manufacturing',102,93,89000)
+ON DUPLICATE KEY UPDATE population=VALUES(population);
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND parameter_key='business_loan';
