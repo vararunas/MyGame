@@ -6,7 +6,7 @@ $error=null;$notice=null;$db=Connection::make();$companyId=(int)($_SESSION['comp
 try{
  if($_SERVER['REQUEST_METHOD']==='POST'){
   if(!hash_equals($csrf,(string)($_POST['csrf']??'')))throw new RuntimeException('Neteisinga saugos užklausa.');
-  if(($_POST['action']??'')==='pay_obligation'){$engine->payObligation($companyId,(int)($_POST['obligation_id']??0));$notice='Mokėjimas atliktas. Pinigai pervesti gavėjo institucijai.';$engine->refreshObligations($companyId);}
+  $action=(string)($_POST['action']??'');if($action==='pay_obligation'){$engine->payObligation($companyId,(int)($_POST['obligation_id']??0));$notice='Mokėjimas atliktas. Pinigai pervesti gavėjo institucijai.';$engine->refreshObligations($companyId);}elseif($action==='pay_loan_installment'){$loans=new \MyGame\Infrastructure\Banking\DatabaseLoanRepository($db);$loans->refreshLoanPayments($companyId);$loans->payInstallment($companyId,(int)($_POST['payment_id']??0));$notice='Paskolos įmoka apmokėta.';}
  }
  $d=(new DatabaseDashboardRepository($db))->data($companyId);
 }catch(Throwable$e){$error=$e->getMessage();$d=null;}
