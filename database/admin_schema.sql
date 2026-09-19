@@ -314,6 +314,68 @@ DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND p
 UPDATE company_bank_accounts a JOIN banks b ON b.id=a.bank_id
 SET a.account_number=CONCAT('LT',LPAD(10+(a.company_id MOD 89),2,'0'),LEFT(UPPER(b.code),2),LPAD(a.bank_id,4,'0'),LPAD(a.company_id,8,'0'))
 WHERE CHAR_LENGTH(a.account_number)>18;
+
+CREATE TABLE IF NOT EXISTS state_institutions (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ country_id INT UNSIGNED NOT NULL,
+ code VARCHAR(40) NOT NULL UNIQUE,
+ name VARCHAR(160) NOT NULL,
+ institution_type ENUM('tax','social','property','utility','customs','treasury') NOT NULL,
+ is_active TINYINT(1) NOT NULL DEFAULT 1,
+ CONSTRAINT fk_state_institution_country FOREIGN KEY(country_id) REFERENCES countries(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS state_bank_accounts (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ institution_id INT UNSIGNED NOT NULL,
+ bank_id INT UNSIGNED NOT NULL,
+ account_number VARCHAR(34) NOT NULL UNIQUE,
+ currency CHAR(3) NOT NULL DEFAULT 'EUR',
+ balance DECIMAL(18,2) NOT NULL DEFAULT 0,
+ is_primary TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_state_account_institution FOREIGN KEY(institution_id) REFERENCES state_institutions(id),
+ CONSTRAINT fk_state_account_bank FOREIGN KEY(bank_id) REFERENCES banks(id),
+ UNIQUE KEY uq_state_institution_bank(institution_id,bank_id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS state_bank_transactions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ account_id BIGINT UNSIGNED NOT NULL,
+ company_id BIGINT UNSIGNED NULL,
+ transaction_type VARCHAR(50) NOT NULL,
+ amount DECIMAL(18,2) NOT NULL,
+ balance_after DECIMAL(18,2) NOT NULL,
+ reference_type VARCHAR(50) NULL,
+ reference_id BIGINT UNSIGNED NULL,
+ description VARCHAR(255) NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ CONSTRAINT fk_state_transaction_account FOREIGN KEY(account_id) REFERENCES state_bank_accounts(id),
+ CONSTRAINT fk_state_transaction_company FOREIGN KEY(company_id) REFERENCES companies(id),
+ INDEX idx_state_transaction_account_date(account_id,created_at)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+ALTER TABLE company_obligations ADD COLUMN IF NOT EXISTS institution_id INT UNSIGNED NULL AFTER institution;
+ALTER TABLE company_obligations ADD COLUMN IF NOT EXISTS recipient_account_id BIGINT UNSIGNED NULL AFTER institution_id;
+
+SET @lt_state=(SELECT id FROM countries WHERE code='LT' LIMIT 1);
+INSERT INTO state_institutions(country_id,code,name,institution_type) VALUES
+(@lt_state,'VMI','Valstybinė mokesčių inspekcija','tax'),
+(@lt_state,'SODRA','Valstybinio socialinio draudimo fondo valdyba','social'),
+(@lt_state,'NT','Valstybės turto ir nekilnojamojo turto administracija','property'),
+(@lt_state,'UTILITIES','Valstybinis energijos ir komunalinių paslaugų centras','utility'),
+(@lt_state,'CUSTOMS','Lietuvos muitinė','customs'),
+(@lt_state,'TREASURY','Lietuvos Respublikos valstybės iždas','treasury')
+ON DUPLICATE KEY UPDATE name=VALUES(name),institution_type=VALUES(institution_type),is_active=1;
+
+INSERT INTO state_bank_accounts(institution_id,bank_id,account_number,currency,balance,is_primary)
+SELECT si.id,b.id,
+ CONCAT('LT90',LEFT(UPPER(b.code),2),LPAD(b.id,4,'0'),LPAD(si.id,8,'0')),
+ 'EUR',0,1
+FROM state_institutions si
+JOIN banks b ON b.country_id=si.country_id AND b.code='VB'
+WHERE NOT EXISTS(SELECT 1 FROM state_bank_accounts sba WHERE sba.institution_id=si.id);
+
 INSERT INTO economic_parameters(country_id,section,parameter_key,label,value,unit) VALUES
 (@lt,'economy','inflation','Infliacija',2.8,'%'),
 (@lt,'economy','gdp_growth','BVP augimas',2.0,'%'),
