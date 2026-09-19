@@ -1,5 +1,8 @@
 <?php
-declare(strict_types=1);session_start();
+declare(strict_types=1);
+error_reporting(E_ALL); ini_set('display_errors','1');
+register_shutdown_function(function():void{$e=error_get_last();if($e&&in_array($e['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR],true)){http_response_code(200);echo '<pre style="background:#28151a;color:#ff9aa8;padding:20px;font:14px monospace;white-space:pre-wrap">PHP klaida: '.htmlspecialchars($e['message']).'\nFailas: '.htmlspecialchars($e['file']).'\nEilutė: '.(int)$e['line'].'</pre>';}});
+session_start();
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$path=__DIR__.'/../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($path))require $path;});
 use MyGame\Infrastructure\Database\Connection;use MyGame\Infrastructure\State\DatabaseStateRepository;
 $error=null;$notice=null;$_SESSION['csrf']??=bin2hex(random_bytes(24));$csrf=$_SESSION['csrf'];
