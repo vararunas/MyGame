@@ -11,7 +11,7 @@ final class DatabaseDashboardRepository{
   $properties=(int)($this->one("SELECT COUNT(*) v FROM company_properties WHERE company_id=? AND status='active'",[$id])['v']??0);
   $loans=$this->one("SELECT COUNT(*) c,COALESCE(SUM(outstanding_principal),0) total,COALESCE(SUM(monthly_payment),0) monthly FROM company_loans WHERE company_id=? AND status='active'",[$id]);
   $due=$this->one("SELECT COUNT(*) c,COALESCE(SUM(amount+penalty_amount),0) total FROM company_obligations WHERE company_id=? AND paid_at IS NULL",[$id]);
-  $late=$this->all("SELECT description,amount+penalty_amount total,due_at FROM company_obligations WHERE company_id=? AND status='late' ORDER BY due_at LIMIT 5",[$id]);
+  $late=$this->all("SELECT id,institution,description,amount+penalty_amount total,due_at,status FROM company_obligations WHERE company_id=? AND paid_at IS NULL ORDER BY CASE WHEN status='late' THEN 0 ELSE 1 END,due_at LIMIT 8",[$id]);
   $cycles=$this->all('SELECT * FROM company_monthly_cycles WHERE company_id=? ORDER BY period DESC LIMIT 6',[$id]);
   $market=$this->one('SELECT * FROM market_demand WHERE city=? AND industry=?',[(string)$company['city'],(string)$company['industry']]);
   $competition=(int)($this->one("SELECT COUNT(*) v FROM companies WHERE city=? AND industry=? AND status='active' AND id<>?",[$company['city'],$company['industry'],$id])['v']??0);
