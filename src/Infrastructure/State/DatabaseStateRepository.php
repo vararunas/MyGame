@@ -11,7 +11,7 @@ final class DatabaseStateRepository{
   $props=$this->all("SELECT * FROM company_properties WHERE company_id=? AND status='active' ORDER BY id DESC",[$companyId]);
   $utils=$this->all("SELECT * FROM company_utility_contracts WHERE company_id=? AND is_active=1 ORDER BY utility_type",[$companyId]);
   $trade=$this->one('SELECT * FROM company_trade_profiles WHERE company_id=?',[$companyId]);
-  $obligations=$this->all("SELECT *,GREATEST(0,DATEDIFF(NOW(),due_at)) late_days FROM company_obligations WHERE company_id=? ORDER BY status='paid',due_at",[$companyId]);
+  $obligations=$this->all("SELECT *,GREATEST(0,DATEDIFF((SELECT game_date FROM game_clock WHERE id=1),due_at)) late_days FROM company_obligations WHERE company_id=? ORDER BY status='paid',due_at",[$companyId]);
   return compact('company','reg','emp','props','utils','trade','obligations');
  }
  public function register(int $companyId):void{$exists=$this->one('SELECT id FROM company_registrations WHERE company_id=?',[$companyId]);if($exists)return;$code='LT'.str_pad((string)$companyId,9,'0',STR_PAD_LEFT);$this->pdo->prepare('INSERT INTO company_registrations(company_id,registration_code) VALUES(?,?)')->execute([$companyId,$code]);$this->pdo->prepare('INSERT IGNORE INTO company_employment(company_id,employees,average_salary) VALUES(?,0,0)')->execute([$companyId]);$this->pdo->prepare('INSERT IGNORE INTO company_trade_profiles(company_id) VALUES(?)')->execute([$companyId]);}
