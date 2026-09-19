@@ -207,6 +207,69 @@ CREATE TABLE IF NOT EXISTS company_trade_profiles (
  CONSTRAINT fk_trade_company FOREIGN KEY(company_id) REFERENCES companies(id)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+
+CREATE TABLE IF NOT EXISTS game_clock (
+ id TINYINT UNSIGNED PRIMARY KEY,
+ game_date DATE NOT NULL,
+ speed TINYINT UNSIGNED NOT NULL DEFAULT 1,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+INSERT INTO game_clock(id,game_date,speed) VALUES(1,CURDATE(),1) ON DUPLICATE KEY UPDATE id=id;
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL AFTER name;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS industry VARCHAR(60) NULL AFTER city;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS starting_capital DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER industry;
+
+CREATE TABLE IF NOT EXISTS property_market (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ city VARCHAR(100) NOT NULL,
+ property_type ENUM('office','shop','warehouse','factory') NOT NULL,
+ title VARCHAR(160) NOT NULL,
+ area_m2 DECIMAL(10,2) NOT NULL,
+ rent_per_m2 DECIMAL(10,2) NOT NULL,
+ monthly_rent DECIMAL(14,2) NOT NULL,
+ utility_factor DECIMAL(8,3) NOT NULL DEFAULT 1,
+ is_available TINYINT(1) NOT NULL DEFAULT 1,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE company_properties ADD COLUMN IF NOT EXISTS market_property_id BIGINT UNSIGNED NULL AFTER company_id;
+
+CREATE TABLE IF NOT EXISTS company_monthly_cycles (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ company_id BIGINT UNSIGNED NOT NULL,
+ period CHAR(7) NOT NULL,
+ revenue DECIMAL(16,2) NOT NULL DEFAULT 0,
+ rent_cost DECIMAL(16,2) NOT NULL DEFAULT 0,
+ utility_cost DECIMAL(16,2) NOT NULL DEFAULT 0,
+ payroll_cost DECIMAL(16,2) NOT NULL DEFAULT 0,
+ payroll_tax DECIMAL(16,2) NOT NULL DEFAULT 0,
+ vat_due DECIMAL(16,2) NOT NULL DEFAULT 0,
+ profit_tax_due DECIMAL(16,2) NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_company_period(company_id,period),
+ CONSTRAINT fk_cycle_company FOREIGN KEY(company_id) REFERENCES companies(id)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS market_demand (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ city VARCHAR(100) NOT NULL,
+ industry VARCHAR(60) NOT NULL,
+ demand_index DECIMAL(10,2) NOT NULL DEFAULT 100,
+ purchasing_power DECIMAL(10,2) NOT NULL DEFAULT 100,
+ population INT UNSIGNED NOT NULL DEFAULT 0,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_market_city_industry(city,industry)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+INSERT INTO property_market(city,property_type,title,area_m2,rent_per_m2,monthly_rent,utility_factor)
+SELECT 'Vilnius','office','Centro biuras',80,9.50,760,0.80 WHERE NOT EXISTS(SELECT 1 FROM property_market);
+INSERT INTO property_market(city,property_type,title,area_m2,rent_per_m2,monthly_rent,utility_factor)
+SELECT 'Vilnius','shop','Prekybinės patalpos',140,9.50,1330,1.10 WHERE (SELECT COUNT(*) FROM property_market)<2;
+INSERT INTO property_market(city,property_type,title,area_m2,rent_per_m2,monthly_rent,utility_factor)
+SELECT 'Kaunas','warehouse','Logistikos sandėlis',500,6.00,3000,0.65 WHERE (SELECT COUNT(*) FROM property_market)<3;
+INSERT INTO property_market(city,property_type,title,area_m2,rent_per_m2,monthly_rent,utility_factor)
+SELECT 'Klaipėda','factory','Gamybinės patalpos',900,7.00,6300,1.80 WHERE (SELECT COUNT(*) FROM property_market)<4;
+
 INSERT INTO countries(code,name,currency) VALUES('LT','Lietuva','EUR') ON DUPLICATE KEY UPDATE name=VALUES(name),currency=VALUES(currency);
 SET @lt=(SELECT id FROM countries WHERE code='LT');
 DELETE FROM economic_parameters WHERE country_id=@lt AND section='banking' AND parameter_key='business_loan';
