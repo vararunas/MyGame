@@ -16,6 +16,7 @@ final class AiCompanyEngine{
    $this->pdo->prepare('INSERT INTO ai_company_profiles(company_id,strategy,target_employees) VALUES(?,?,?) ON DUPLICATE KEY UPDATE strategy=VALUES(strategy)')->execute([$id,$x[3],$x[4]]);
    $this->ensureBank($id,(float)($this->one('SELECT starting_capital FROM companies WHERE id=?',[$id])['starting_capital']??0));
    $this->ensureEmployees($id,(int)$x[4]);
+   $this->ensureAccountant($id);
    $this->ensureInventory($id,(string)$x[2]);
    $this->syncEmployment($id);
   }
@@ -25,7 +26,7 @@ final class AiCompanyEngine{
   foreach($s as $c){
    $id=(int)$c['id'];$profit=(float)$c['monthly_profit'];$q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cash=(float)$q->fetchColumn();$months=$profit<0?(int)$c['months_in_loss']+1:0;$target=(int)$c['target_employees'];
    if($profit>2500&&$c['strategy']==='growth')$target++;if(($profit<0||$cash<5000)&&$target>1)$target--;
-   $this->resizeEmployees($id,$target);$this->restock($id,(string)$c['industry'],$cash);$this->syncEmployment($id);
+   $this->resizeEmployees($id,$target);$this->ensureAccountant($id);$this->restock($id,(string)$c['industry'],$cash);$this->syncEmployment($id);
    $this->pdo->prepare('UPDATE ai_company_profiles SET target_employees=?,months_in_loss=? WHERE company_id=?')->execute([$target,$months,$id]);
    if($cash<=0&&$months>=6)$this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=?")->execute([$id]);
   }
@@ -38,10 +39,15 @@ final class AiCompanyEngine{
   $this->pdo->prepare("INSERT INTO bank_account_transactions(account_id,transaction_type,amount,balance_after,reference_type,description,game_date) VALUES(?,?,?,?,?,?,(SELECT game_date FROM game_clock WHERE id=1))")->execute([$aid,'capital_contribution',$capital,$capital,'ai_seed','AI pradinis kapitalas']);
  }
  private function ensureEmployees(int $id,int $target):void{if((int)($this->one("SELECT COUNT(*) c FROM company_employees WHERE company_id=? AND status='active'",[$id])['c']??0)>0)return;$this->resizeEmployees($id,$target);}
+ private function ensureAccountant(int $id):void{
+  if($this->one("SELECT e.id FROM company_employees e JOIN job_roles r ON r.id=e.role_id WHERE e.company_id=? AND e.status='active' AND r.automation_type='accounting' LIMIT 1",[$id]))return;
+  $role=$this->one("SELECT id,base_salary FROM job_roles WHERE automation_type='accounting' LIMIT 1");if(!$role)return;$date=(string)$this->pdo->query('SELECT game_date FROM game_clock WHERE id=1')->fetchColumn();$salary=max((float)$role['base_salary'],$this->param('minimum_wage'));
+  $this->pdo->prepare("INSERT INTO company_employees(company_id,role_id,full_name,salary,skill,status,hired_at) VALUES(?,?,?,?,85,'active',?)")->execute([$id,$role['id'],'AI buhalteris',$salary,$date]);
+ }
  private function resizeEmployees(int $id,int $target):void{
-  $current=(int)($this->one("SELECT COUNT(*) c FROM company_employees WHERE company_id=? AND status='active'",[$id])['c']??0);$role=(int)$this->pdo->query("SELECT id FROM job_roles WHERE automation_type IS NULL ORDER BY id LIMIT 1")->fetchColumn();if(!$role)return;$salary=max($this->param('minimum_wage'),$this->param('average_wage'));
+  $current=(int)($this->one("SELECT COUNT(*) c FROM company_employees e JOIN job_roles r ON r.id=e.role_id WHERE e.company_id=? AND e.status='active' AND (r.automation_type IS NULL OR r.automation_type<>'accounting')",[$id])['c']??0);$role=(int)$this->pdo->query("SELECT id FROM job_roles WHERE automation_type IS NULL ORDER BY id LIMIT 1")->fetchColumn();if(!$role)return;$salary=max($this->param('minimum_wage'),$this->param('average_wage'));
   while($current<$target){$date=(string)$this->pdo->query('SELECT game_date FROM game_clock WHERE id=1')->fetchColumn();$this->pdo->prepare("INSERT INTO company_employees(company_id,role_id,full_name,salary,skill,status,hired_at) VALUES(?,?,?,?,70,'active',?)")->execute([$id,$role,'AI darbuotojas '.($current+1),$salary,$date]);$current++;}
-  while($current>$target){$e=$this->one("SELECT id FROM company_employees WHERE company_id=? AND status='active' ORDER BY id DESC LIMIT 1",[$id]);if(!$e)break;$this->pdo->prepare("UPDATE company_employees SET status='dismissed' WHERE id=?")->execute([$e['id']]);$current--;}
+  while($current>$target){$e=$this->one("SELECT e.id FROM company_employees e JOIN job_roles r ON r.id=e.role_id WHERE e.company_id=? AND e.status='active' AND (r.automation_type IS NULL OR r.automation_type<>'accounting') ORDER BY e.id DESC LIMIT 1",[$id]);if(!$e)break;$this->pdo->prepare("UPDATE company_employees SET status='dismissed' WHERE id=?")->execute([$e['id']]);$current--;}
  }
  private function ensureInventory(int $id,string $industry):void{
   $p=$this->one('SELECT * FROM products WHERE industry=? ORDER BY id LIMIT 1',[$industry]);if(!$p)return;
