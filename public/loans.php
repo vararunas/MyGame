@@ -3,7 +3,7 @@ declare(strict_types=1);session_start();
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$path=__DIR__.'/../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($path))require $path;});
 use MyGame\Infrastructure\Database\Connection;use MyGame\Infrastructure\Banking\DatabaseLoanRepository;use MyGame\Domain\Banking\LoanRiskCalculator;
 $error=null;$offer=null;$notice=null;
-try{$repo=new DatabaseLoanRepository(Connection::make());$company=$repo->ensureDemoCompany();$accounts=$repo->accounts((int)$company['id']);$account=$accounts[0]??null;$transactions=$account?$repo->transactions((int)$account['id']):[];$banks=$repo->banks();$policy=$repo->policy();$calc=new LoanRiskCalculator();
+try{$db=Connection::make();$engine=new \MyGame\Infrastructure\Economy\GameEconomyEngine($db);$engine->sync();$repo=new DatabaseLoanRepository($db);$companyId=(int)($_SESSION['company_id']??1);$company=$repo->company($companyId);if(!$company)throw new RuntimeException('Įmonė nerasta.');$accounts=$repo->accounts((int)$company['id']);$account=$accounts[0]??null;$transactions=$account?$repo->transactions((int)$account['id']):[];$banks=$repo->banks();$policy=$repo->policy();$calc=new LoanRiskCalculator();
  $repo->migrateActiveLoanDatesToGameClock((int)$company['id']);$repo->refreshLoanPayments((int)$company['id']);
  if($_SERVER['REQUEST_METHOD']==='POST'){if(!hash_equals($_SESSION['loan_csrf']??'',(string)($_POST['csrf']??'')))throw new RuntimeException('Neteisinga saugos užklausa.');
   $action=(string)($_POST['action']??'loan');$bankId=(int)($_POST['bank_id']??0);
