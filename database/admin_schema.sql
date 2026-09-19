@@ -624,3 +624,12 @@ CREATE TABLE IF NOT EXISTS company_payment_arrears (
  CONSTRAINT fk_arrears_company FOREIGN KEY(company_id) REFERENCES companies(id),
  INDEX idx_arrears_company(company_id,status)
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+
+ALTER TABLE game_clock ADD COLUMN IF NOT EXISTS test_offset_days INT NOT NULL DEFAULT 0;
+ALTER TABLE game_clock ADD COLUMN IF NOT EXISTS last_processed_date DATE NULL;
+UPDATE game_clock SET game_date=CURRENT_DATE, test_offset_days=0, last_processed_date=CURRENT_DATE WHERE id=1;
+ALTER TABLE bank_account_transactions ADD COLUMN IF NOT EXISTS game_date DATE NULL;
+ALTER TABLE state_bank_transactions ADD COLUMN IF NOT EXISTS game_date DATE NULL;
+UPDATE bank_account_transactions SET game_date=DATE(created_at) WHERE game_date IS NULL;
+UPDATE state_bank_transactions SET game_date=DATE(created_at) WHERE game_date IS NULL;
