@@ -9,7 +9,7 @@ final class AiCompanyEngine{
   $rows=[['Baltic Retail','Vilnius','retail','growth',6],['Kauno Prekyba','Kaunas','retail','balanced',4],['Transa LT','Kaunas','logistics','growth',8],['Klaipėdos Logistika','Klaipėda','logistics','balanced',7],['Nord Gamyba','Šiauliai','manufacturing','cautious',10],['Aukštaitijos Gamyba','Panevėžys','manufacturing','balanced',8],['Miesto Paslaugos','Vilnius','services','growth',5],['Verslo Servisas','Kaunas','services','cautious',3]];
   foreach($rows as $x){
    $exists=$this->one('SELECT id FROM companies WHERE name=?',[$x[0]]);
-   if($exists){$id=(int)$exists['id'];$this->pdo->prepare("UPDATE companies SET company_type='ai' WHERE id=?")->execute([$id]);}
+   if($exists){$id=(int)$exists['id'];$this->pdo->prepare("UPDATE companies SET company_type='ai' WHERE id=?")->execute([$id]);$bank=(float)($this->one('SELECT COALESCE(SUM(balance),0) b FROM company_bank_accounts WHERE company_id=? AND is_active=1',[$id])['b']??0);if($bank>0){$this->pdo->prepare("UPDATE companies SET status='active' WHERE id=? AND company_type='ai' AND status='bankrupt'")->execute([$id]);$this->pdo->prepare("UPDATE ai_company_profiles SET months_in_loss=0 WHERE company_id=?")->execute([$id]);}}
    else{$capital=25000+$x[4]*4000;$s=$this->pdo->prepare("INSERT INTO companies(country_id,name,city,industry,starting_capital,company_type,status,cash,assets) VALUES(?,?,?,?,?,'ai','active',?,?)");$s->execute([$country,$x[0],$x[1],$x[2],$capital,$capital,$capital]);$id=(int)$this->pdo->lastInsertId();}
    $this->pdo->prepare('INSERT INTO company_employment(company_id) VALUES(?) ON DUPLICATE KEY UPDATE company_id=VALUES(company_id)')->execute([$id]);
    $this->pdo->prepare('INSERT INTO company_trade_profiles(company_id,import_enabled,export_enabled) VALUES(?,1,1) ON DUPLICATE KEY UPDATE import_enabled=1,export_enabled=1')->execute([$id]);
@@ -27,8 +27,9 @@ final class AiCompanyEngine{
    $id=(int)$c['id'];$profit=(float)$c['monthly_profit'];$q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cash=(float)$q->fetchColumn();$months=$profit<0?(int)$c['months_in_loss']+1:0;$target=(int)$c['target_employees'];
    if($profit>2500&&$c['strategy']==='growth')$target++;if(($profit<0||$cash<5000)&&$target>1)$target--;
    $this->resizeEmployees($id,$target);$this->ensureAccountant($id);$this->restock($id,(string)$c['industry'],$cash);$this->syncEmployment($id);
+   $q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cashAfter=(float)$q->fetchColumn();
    $this->pdo->prepare('UPDATE ai_company_profiles SET target_employees=?,months_in_loss=? WHERE company_id=?')->execute([$target,$months,$id]);
-   if($cash<=0&&$months>=6)$this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=?")->execute([$id]);
+   if($cashAfter<=0&&$months>=6)$this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=?")->execute([$id]);
   }
  }
  private function ensureBank(int $id,float $capital):void{
