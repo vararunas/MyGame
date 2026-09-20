@@ -4,7 +4,7 @@ namespace MyGame\Infrastructure\Banking;
 use PDO;
 final class DatabaseLoanRepository {
  public function __construct(private PDO $pdo){}
- public function company(int $id): ?array {$s=$this->pdo->prepare('SELECT * FROM companies WHERE id=?');$s->execute([$id]);return $s->fetch()?:null;}
+ public function company(int $id): ?array {$s=$this->pdo->prepare('SELECT c.*,(SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=c.id AND is_active=1) bank_balance FROM companies c WHERE c.id=?');$s->execute([$id]);return $s->fetch()?:null;}
  public function ensureDemoCompany(): array {$c=$this->company(1);if($c)return $c;$country=(int)$this->pdo->query("SELECT id FROM countries WHERE code='LT' LIMIT 1")->fetchColumn();$s=$this->pdo->prepare('INSERT INTO companies(country_id,name,cash,assets,liabilities,monthly_revenue,monthly_profit,age_months) VALUES(?,?,?,?,?,?,?,?)');$s->execute([$country,'Mano įmonė',25000,40000,5000,18000,3200,18]);return $this->company((int)$this->pdo->lastInsertId());}
  public function accounts(int $companyId): array {$s=$this->pdo->prepare('SELECT a.*,b.name bank_name,b.code bank_code FROM company_bank_accounts a JOIN banks b ON b.id=a.bank_id WHERE a.company_id=? AND a.is_active=1 ORDER BY a.is_primary DESC,a.id');$s->execute([$companyId]);return $s->fetchAll();}
  public function accountAtBank(int $companyId,int $bankId): ?array {$s=$this->pdo->prepare('SELECT a.*,b.name bank_name,b.code bank_code FROM company_bank_accounts a JOIN banks b ON b.id=a.bank_id WHERE a.company_id=? AND a.bank_id=? AND a.is_active=1 LIMIT 1');$s->execute([$companyId,$bankId]);return $s->fetch()?:null;}
