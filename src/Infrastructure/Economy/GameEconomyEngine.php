@@ -11,19 +11,14 @@ final class GameEconomyEngine{
   $period=(new \DateTimeImmutable($target))->modify('first day of this month')->modify('-1 month')->format('Y-m');
   $out=[];
   foreach($this->pdo->query("SELECT id,name,status FROM companies WHERE company_type='ai' ORDER BY id") as $row){
-   $id=(int)$row['id'];
-   $before=$this->one('SELECT id FROM company_monthly_cycles WHERE company_id=? AND period=?',[$id,$period]);
+   $id=(int)$row['id'];$before=$this->one('SELECT id FROM company_monthly_cycles WHERE company_id=? AND period=?',[$id,$period]);
    $employees=(int)($this->one("SELECT COUNT(*) c FROM company_employees WHERE company_id=? AND status='active'",[$id])['c']??0);
    $inventory=(int)($this->one('SELECT COUNT(*) c FROM company_inventory WHERE company_id=? AND quantity>0',[$id])['c']??0);
    $accountRow=$this->one('SELECT COUNT(*) c,COALESCE(SUM(balance),0) balance FROM company_bank_accounts WHERE company_id=? AND is_primary=1 AND is_active=1',[$id]);
-   $account=(int)($accountRow['c']??0);$balance=(float)($accountRow['balance']??0);
-   $statusBefore=(string)$row['status'];$status=$statusBefore;$repairedStatus=false;$error=null;
-   if($status!=='active'&&$balance>0&&$employees>0){$this->pdo->prepare("UPDATE companies SET status='active' WHERE id=? AND company_type='ai'")->execute([$id]);$status='active';$repairedStatus=true;}
-   if(!$before&&$status==='active'){try{$this->processCompanyMonth($id,$period);}catch(\Throwable $e){$error=get_class($e).': '.$e->getMessage();}}
+   $error=null;if(!$before&&$row['status']==='active'){try{$this->processCompanyMonth($id,$period);}catch(\Throwable $e){$error=get_class($e).': '.$e->getMessage();}}
    $after=$this->one('SELECT id,revenue,payroll_cost,payroll_tax,vat_due,profit_tax_due FROM company_monthly_cycles WHERE company_id=? AND period=?',[$id,$period]);
-   $out[]=['id'=>$id,'name'=>$row['name'],'period'=>$period,'status_before'=>$statusBefore,'status'=>$status,'status_repaired'=>$repairedStatus,'balance'=>$balance,'employees'=>$employees,'inventory'=>$inventory,'account'=>$account,'cycle_before'=>(bool)$before,'cycle_after'=>(bool)$after,'cycle'=>$after?:null,'error'=>$error];
-  }
-  return$out;
+   $out[]=['id'=>$id,'name'=>$row['name'],'period'=>$period,'status_before'=>$row['status'],'status'=>$row['status'],'status_repaired'=>false,'balance'=>(float)($accountRow['balance']??0),'employees'=>$employees,'inventory'=>$inventory,'account'=>(int)($accountRow['c']??0),'cycle_before'=>(bool)$before,'cycle_after'=>(bool)$after,'cycle'=>$after?:null,'error'=>$error];
+  }return$out;
  }
  public function advance(int $days=1):string{$days=max(1,min(31,$days));$this->pdo->prepare('UPDATE game_clock SET test_offset_days=test_offset_days+? WHERE id=1')->execute([$days]);return$this->sync();}
  public function resetTestOffset():string{$this->pdo->exec('UPDATE game_clock SET test_offset_days=0,last_processed_date=CURRENT_DATE,game_date=CURRENT_DATE WHERE id=1');return date('Y-m-d');}
