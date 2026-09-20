@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);session_start();
+declare(strict_types=1);session_start();require __DIR__.'/auth.php';
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$p=__DIR__.'/../../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($p))require$p;});
 use MyGame\Infrastructure\Database\Connection;use MyGame\Infrastructure\Economy\GameEconomyEngine;use MyGame\Infrastructure\Economy\AiCompanyEngine;
 $error=null;$rows=[];$audit=[];$gameDate='—';

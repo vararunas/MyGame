@@ -628,7 +628,7 @@ CREATE TABLE IF NOT EXISTS company_payment_arrears (
 
 ALTER TABLE game_clock ADD COLUMN IF NOT EXISTS test_offset_days INT NOT NULL DEFAULT 0;
 ALTER TABLE game_clock ADD COLUMN IF NOT EXISTS last_processed_date DATE NULL;
-UPDATE game_clock SET game_date=CURRENT_DATE, test_offset_days=0, last_processed_date=CURRENT_DATE WHERE id=1;
+UPDATE game_clock SET last_processed_date=COALESCE(last_processed_date,game_date) WHERE id=1;
 ALTER TABLE bank_account_transactions ADD COLUMN IF NOT EXISTS game_date DATE NULL;
 ALTER TABLE state_bank_transactions ADD COLUMN IF NOT EXISTS game_date DATE NULL;
 UPDATE bank_account_transactions SET game_date=DATE(created_at) WHERE game_date IS NULL;
