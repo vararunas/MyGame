@@ -9,7 +9,7 @@ final class LoanRiskCalculator
   $assets=max(0.0,(float)($company['assets']??0));$cash=max(0.0,(float)($company['bank_balance']??$company['cash']??0));
   $liabilities=max(0.0,(float)($company['liabilities']??0));$revenue=max(0.0,(float)($company['monthly_revenue']??0));
   $profit=(float)($company['monthly_profit']??0);$age=max(0,(int)($company['age_months']??0));
-  $equity=$assets+$cash-$liabilities;$totalAfter=max(1.0,$assets+$cash+$amount);
+  $nonCashAssets=max(0.0,$assets-(float)($company['starting_capital']??0));$equity=$nonCashAssets+$cash-$liabilities;$totalAfter=max(1.0,$nonCashAssets+$cash+$amount);
   $equityPct=max(0.0,100*$equity/$totalAfter);
   $score=50.0;
   $score+=min(20.0,$equityPct*0.5);

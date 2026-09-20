@@ -13,6 +13,7 @@ final class DatabaseCompanyRepository{
   if($address==='')throw new \RuntimeException('Įveskite registracijos adresą.');
   if($manager==='')throw new \RuntimeException('Įveskite vadovo vardą ir pavardę.');
   $minCapital=$legalForm==='UAB'?2500:1000;
+  if(!is_finite($capital)||$capital>100000)throw new \RuntimeException('Pradinis kapitalas negali viršyti 100 000 €.');
   if($capital<$minCapital)throw new \RuntimeException($legalForm.' pradinis kapitalas turi būti bent '.number_format($minCapital,0,',',' ').' €.');
   $dupe=$this->pdo->prepare('SELECT id FROM companies WHERE LOWER(name)=LOWER(?) LIMIT 1');$dupe->execute([$name]);if($dupe->fetch())throw new \RuntimeException('Toks įmonės pavadinimas jau registruotas.');
   $this->pdo->beginTransaction();try{
