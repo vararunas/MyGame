@@ -2,7 +2,7 @@
 declare(strict_types=1);session_start();require __DIR__.'/auth.php';
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$p=__DIR__.'/../../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($p))require$p;});
 use MyGame\Infrastructure\Database\Connection;
-$error=null;$checks=[];$rows=[];$gameDate='—';$issues=[];$stats=[];$salesReadiness=[];
+$error=null;$checks=[];$rows=[];$gameDate='—';$issues=[];$stats=[];$salesReadiness=[];$salesEngine=[];
 try{
  $db=Connection::make();$gameDate=(string)($db->query("SELECT game_date FROM game_clock WHERE id=1")->fetchColumn()?:'—');
  $tables=['companies','company_bank_accounts','company_inventory','sales_ledger','company_monthly_cycles','bank_account_transactions','company_employees','company_properties','company_utility_contracts'];
@@ -82,6 +82,19 @@ try{
   if($blockers)$issues[]=['area'=>'Pardavimų paleidimas','company'=>$co['name'],'period'=>'—','detail'=>implode('; ',$blockers),'level'=>'warn'];
  }
 
+ // Pardavimų variklio skaičiavimas – ta pati formulė kaip GameEconomyEngine::salesRevenue(), tik READ ONLY.
+ foreach($companyRows as $co){
+  $id=(int)$co['id'];$industry=(string)$co['industry'];$city=(string)$co['city'];
+  $s=$db->prepare("SELECT i.product_id,i.quantity,i.average_cost,i.sale_price,p.name,p.base_price,p.demand_weight,p.price_elasticity FROM company_inventory i JOIN products p ON p.id=i.product_id WHERE i.company_id=? AND i.quantity>0 ORDER BY p.name");$s->execute([$id]);$products=$s->fetchAll();
+  $s=$db->prepare("SELECT demand_index,purchasing_power FROM market_demand WHERE city=? AND industry=? LIMIT 1");$s->execute([$city,$industry]);$md=$s->fetch()?:[];
+  $s=$db->prepare("SELECT monthly_budget,brand_awareness,reputation FROM company_marketing WHERE company_id=? LIMIT 1");$s->execute([$id]);$mk=$s->fetch()?:[];
+  $d=(float)($md['demand_index']??100);$power=(float)($md['purchasing_power']??100);$brand=(float)($mk['brand_awareness']??50);$budget=(float)($mk['monthly_budget']??0);
+  $plannedRevenue=0;$plannedQty=0;$productCalc=[];
+  foreach($products as $x){$price=(float)($x['sale_price']?:$x['base_price']);$ratio=(float)$x['base_price']/max(.01,$price);$elasticity=max(.20,(float)($x['price_elasticity']??1));$priceEffect=max(.20,min(2.00,pow($ratio,$elasticity)));$weight=max(.10,(float)($x['demand_weight']??1));$units=max(1,round((20+$brand*.4+sqrt(max(0,$budget)))*($d/100)*($power/100)*$weight*$priceEffect));$qty=min((float)$x['quantity'],$units);$rev=round($qty*$price,2);$plannedQty+=$qty;$plannedRevenue+=$rev;$productCalc[]=['name'=>$x['name'],'stock'=>(float)$x['quantity'],'price'=>$price,'base_price'=>(float)$x['base_price'],'weight'=>$weight,'elasticity'=>$elasticity,'price_effect'=>$priceEffect,'demand_units'=>$units,'planned_qty'=>$qty,'planned_revenue'=>$rev];}
+  $competition=(int)(function()use($db,$city,$industry,$id){$q=$db->prepare("SELECT COUNT(*) FROM companies WHERE city=? AND industry=? AND status='active' AND id<>?");$q->execute([$city,$industry,$id]);return$q->fetchColumn();})();
+  $latest=$db->prepare("SELECT period,revenue FROM company_monthly_cycles WHERE company_id=? ORDER BY period DESC LIMIT 1");$latest->execute([$id]);$lastCycle=$latest->fetch()?:[];
+  $salesEngine[]=['name'=>$co['name'],'city'=>$city,'industry'=>$industry,'demand'=>$d,'power'=>$power,'brand'=>$brand,'budget'=>$budget,'competition'=>$competition,'products'=>$productCalc,'planned_qty'=>$plannedQty,'planned_revenue'=>round($plannedRevenue,2),'households'=>$households,'payable_revenue'=>round(min($plannedRevenue,$households),2),'last_period'=>$lastCycle['period']??'—','last_revenue'=>(float)($lastCycle['revenue']??0)];
+ }
  // Pardavimų neatitikimus perkeliam ir į bendrą problemų sąrašą
  foreach($rows as $x)if($x['level']!=='ok')$issues[]=['area'=>'Pardavimai','company'=>$x['name'],'period'=>$x['period'],'detail'=>'sales_ledger '.$x['ledger_revenue'].' € · ciklas '.$x['cycle_revenue'].' € · bankas '.$x['bank_revenue'].' €','level'=>'error'];
  $stats=['companies'=>(int)$db->query("SELECT COUNT(*) FROM companies")->fetchColumn(),'errors'=>count(array_filter($issues,fn($x)=>$x['level']==='error')),'warnings'=>count(array_filter($issues,fn($x)=>$x['level']==='warn')),'cycles'=>(int)$db->query("SELECT COUNT(*) FROM company_monthly_cycles")->fetchColumn()];
