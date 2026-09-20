@@ -693,3 +693,11 @@ INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supp
 SELECT 'Verslo Partneriai LT','LT','services',0.93,1,'domestic' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Verslo Partneriai LT');
 INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
 SELECT 'EU Service Network','EE','services',0.87,3,'foreign' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='EU Service Network');
+
+
+-- COMPANY REGISTRATION V2: real company incorporation data
+ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS legal_form VARCHAR(20) NOT NULL DEFAULT 'UAB' AFTER company_id;
+ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS registered_address VARCHAR(180) NULL AFTER registration_code;
+ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS manager_name VARCHAR(120) NULL AFTER registered_address;
+ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS share_capital DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER manager_name;
+ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS incorporation_fee DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER share_capital;
