@@ -2,8 +2,8 @@
 declare(strict_types=1);session_start();
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$p=__DIR__.'/../../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($p))require$p;});
 use MyGame\Infrastructure\Database\Connection;use MyGame\Infrastructure\Economy\GameEconomyEngine;use MyGame\Infrastructure\Economy\AiCompanyEngine;
-$error=null;$rows=[];$gameDate='—';
-try{$db=Connection::make();$engine=new GameEconomyEngine($db);$gameDate=$engine->sync();(new AiCompanyEngine($db))->seed();$engine->runAutoAccountingForAll();
+$error=null;$rows=[];$audit=[];$gameDate='—';
+try{$db=Connection::make();$engine=new GameEconomyEngine($db);$gameDate=$engine->sync();(new AiCompanyEngine($db))->seed();$audit=$engine->auditAndRepairAiCycles($gameDate);$engine->runAutoAccountingForAll();
 $sql="SELECT c.id,c.name,c.city,c.industry,c.status,
 COALESCE((SELECT SUM(a.balance) FROM company_bank_accounts a WHERE a.company_id=c.id AND a.is_active=1),0) bank_balance,
 (SELECT COUNT(*) FROM company_employees e WHERE e.company_id=c.id AND e.status='active') employees,
