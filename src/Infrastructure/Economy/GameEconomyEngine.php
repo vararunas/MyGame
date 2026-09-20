@@ -22,6 +22,26 @@ final class GameEconomyEngine{
  }
  public function advance(int $days=1):string{$days=max(1,min(31,$days));$this->pdo->prepare('UPDATE game_clock SET test_offset_days=test_offset_days+? WHERE id=1')->execute([$days]);return$this->sync();}
  public function resetTestOffset():string{$this->pdo->exec('UPDATE game_clock SET test_offset_days=0,last_processed_date=CURRENT_DATE,game_date=CURRENT_DATE WHERE id=1');return date('Y-m-d');}
+ public function fullGameReset():void{
+  $this->pdo->beginTransaction();
+  try{
+   // Transaction/history tables first.
+   foreach(['loan_payments','bank_account_transactions','state_bank_transactions','economy_sector_transactions','payroll_ledger','sales_ledger','purchase_orders','company_payment_arrears','company_obligations','state_expenses','company_monthly_cycles','economy_snapshots'] as $table)$this->pdo->exec('DELETE FROM '.$table);
+   // Company-owned state.
+   foreach(['company_tax_accounts','company_inventory','company_marketing','company_employees','company_employment','company_utility_contracts','company_properties','company_trade_profiles','ai_company_profiles','company_registrations','company_loans','loan_applications','company_bank_accounts'] as $table)$this->pdo->exec('DELETE FROM '.$table);
+   // A supplier may optionally point at a simulated company; catalog suppliers themselves stay.
+   $this->pdo->exec('UPDATE suppliers SET company_id=NULL WHERE company_id IS NOT NULL');
+   $this->pdo->exec('DELETE FROM companies');
+   // Restore reusable world state, not administrator configuration.
+   $this->pdo->exec('UPDATE property_market SET is_available=1');
+   $this->pdo->exec('UPDATE state_bank_accounts SET balance=0');
+   $this->pdo->exec("UPDATE economy_sectors SET balance=CASE code WHEN 'HOUSEHOLDS' THEN 2500000000 WHEN 'FOREIGN' THEN 5000000000 WHEN 'DOMESTIC_BUSINESS' THEN 250000000 ELSE balance END");
+   $this->pdo->exec('UPDATE game_clock SET test_offset_days=0,game_date=CURRENT_DATE,last_processed_date=CURRENT_DATE WHERE id=1');
+   $this->pdo->commit();
+  }catch(\Throwable $e){if($this->pdo->inTransaction())$this->pdo->rollBack();throw $e;}
+  // Fresh AI belongs to the new game, so seed only after the old game committed away.
+  (new AiCompanyEngine($this->pdo))->seed();
+ }
  public function clearTestHistory():void{$this->pdo->beginTransaction();try{$this->pdo->exec("DELETE FROM company_payment_arrears");$this->pdo->exec("DELETE FROM payroll_ledger");$this->pdo->exec("DELETE FROM company_obligations");$this->pdo->exec("DELETE FROM sales_ledger");$this->pdo->exec("DELETE FROM company_monthly_cycles");$this->pdo->exec("DELETE FROM economy_snapshots");$this->pdo->exec("DELETE FROM economy_sector_transactions");$this->pdo->exec("DELETE FROM state_bank_transactions");$this->pdo->exec("DELETE FROM state_expenses");$this->pdo->exec("UPDATE state_bank_accounts SET balance=0");$this->pdo->exec("DELETE FROM bank_account_transactions WHERE reference_type IN ('obligation','operating_cost') OR transaction_type IN ('salary_payment','sales_revenue','rent','utilities','marketing_expense','state_payment')");$this->pdo->exec("UPDATE companies SET monthly_revenue=0,monthly_profit=0");$this->pdo->exec("UPDATE company_tax_accounts SET vat_credit=0,tax_loss_carryforward=0");$this->pdo->exec("UPDATE game_clock SET test_offset_days=0,game_date=CURRENT_DATE,last_processed_date=CURRENT_DATE WHERE id=1");$this->pdo->commit();}catch(\Throwable $e){if($this->pdo->inTransaction())$this->pdo->rollBack();throw $e;}}
  private function deliverOrders(string $date):void{$s=$this->pdo->prepare("SELECT * FROM purchase_orders WHERE status='ordered' AND arrives_at<=?");$s->execute([$date]);foreach($s as $o){$inv=$this->one('SELECT * FROM company_inventory WHERE company_id=? AND product_id=?',[$o['company_id'],$o['product_id']]);$oldQty=(float)($inv['quantity']??0);$oldCost=(float)($inv['average_cost']??0);$qty=(float)$o['quantity'];$landed=((float)$o['total_cost']-(float)($o['input_vat']??0))/$qty;$newQty=$oldQty+$qty;$avg=$newQty>0?(($oldQty*$oldCost)+($qty*$landed))/$newQty:$landed;$this->pdo->prepare('INSERT INTO company_inventory(company_id,product_id,quantity,average_cost,sale_price) VALUES(?,?,?,?,0) ON DUPLICATE KEY UPDATE quantity=VALUES(quantity),average_cost=VALUES(average_cost)')->execute([$o['company_id'],$o['product_id'],$newQty,round($avg,4)]);$this->pdo->prepare("UPDATE purchase_orders SET status='delivered' WHERE id=?")->execute([$o['id']]);}}
  private function ensureAiMonthlyCycles(string $target):void{$period=(new \DateTimeImmutable($target))->modify('first day of this month')->modify('-1 month')->format('Y-m');foreach($this->pdo->query("SELECT id FROM companies WHERE company_type='ai' AND status='active'") as $row){$id=(int)$row['id'];if(!$this->one('SELECT id FROM company_monthly_cycles WHERE company_id=? AND period=?',[$id,$period]))$this->processCompanyMonth($id,$period);}}
