@@ -647,3 +647,49 @@ SELECT 'Baltic Industrial Supply','LT','manufacturing',1,3 WHERE NOT EXISTS(SELE
 INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days)
 SELECT 'Verslo paslaugų tinklas','LT','services',1,1 WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Verslo paslaugų tinklas');
 UPDATE suppliers SET supplier_type=IF(country_code='LT','domestic','foreign');
+
+
+-- MARKET CATALOG V2: real product assortment and product-level demand
+ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(80) NOT NULL DEFAULT 'Kita' AFTER name;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS demand_weight DECIMAL(8,3) NOT NULL DEFAULT 1.000 AFTER base_price;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS price_elasticity DECIMAL(8,3) NOT NULL DEFAULT 1.000 AFTER demand_weight;
+
+INSERT INTO products(sku,name,category,industry,base_cost,base_price,demand_weight,price_elasticity) VALUES
+('RET-101','Pienas 1 l','Maistas','retail',0.78,1.29,1.35,0.85),
+('RET-102','Malta kava 500 g','Maistas','retail',3.90,6.49,1.05,1.05),
+('RET-103','Skalbimo gelis 2 l','Buitis','retail',4.60,8.49,0.92,1.20),
+('RET-104','Indų ploviklis 750 ml','Buitis','retail',1.35,2.69,0.88,1.15),
+('RET-105','Popieriniai rankšluosčiai','Buitis','retail',1.65,3.29,0.95,1.10),
+('LOG-101','Vietinis paletės pervežimas','Krovinių vežimas','logistics',28,55,1.20,1.10),
+('LOG-102','LT terminalo pristatymas','Krovinių vežimas','logistics',52,95,1.00,1.05),
+('LOG-103','Tarptautinis paletės pervežimas','Krovinių vežimas','logistics',115,195,0.85,1.15),
+('LOG-104','Sandėliavimas 1 paletė / mėn.','Sandėliavimas','logistics',12,25,0.90,0.90),
+('LOG-105','Ekspres pristatymas','Krovinių vežimas','logistics',75,135,0.70,1.30),
+('MAN-101','Medinė transportavimo paletė','Pakuotė','manufacturing',7.80,13.90,1.15,1.10),
+('MAN-102','Kartoninė transportavimo dėžė','Pakuotė','manufacturing',0.82,1.55,1.30,1.20),
+('MAN-103','Plastikinė talpa 5 l','Plastikas','manufacturing',1.65,3.10,0.95,1.15),
+('MAN-104','Metalo detalė A','Metalo gaminiai','manufacturing',8.50,15.90,0.82,1.05),
+('MAN-105','Medinė lentyna','Baldai','manufacturing',24,44,0.72,1.20),
+('SRV-101','Buhalterinė apskaita / mėn.','Verslo paslaugos','services',45,95,1.10,0.85),
+('SRV-102','Reklamos kampanijos administravimas','Marketingas','services',70,145,0.90,1.10),
+('SRV-103','IT priežiūra / mėn.','IT','services',85,175,1.00,0.80),
+('SRV-104','Verslo konsultacija','Konsultacijos','services',55,120,0.75,1.20),
+('SRV-105','Dokumentų administravimas','Verslo paslaugos','services',30,65,0.85,1.00)
+ON DUPLICATE KEY UPDATE name=VALUES(name),category=VALUES(category),industry=VALUES(industry),base_cost=VALUES(base_cost),base_price=VALUES(base_price),demand_weight=VALUES(demand_weight),price_elasticity=VALUES(price_elasticity);
+
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Kauno Didmena','LT','retail',0.96,3,'domestic' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Kauno Didmena');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Polska Hurt','PL','retail',0.84,5,'foreign' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Polska Hurt');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'LT Transport Partner','LT','logistics',0.92,2,'domestic' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='LT Transport Partner');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Baltic Logistics Supply','LV','logistics',0.86,4,'foreign' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Baltic Logistics Supply');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Lietuvos Žaliavos','LT','manufacturing',0.94,3,'domestic' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Lietuvos Žaliavos');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Central Europe Materials','PL','manufacturing',0.82,6,'foreign' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Central Europe Materials');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'Verslo Partneriai LT','LT','services',0.93,1,'domestic' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='Verslo Partneriai LT');
+INSERT INTO suppliers(name,country_code,industry,price_factor,delivery_days,supplier_type)
+SELECT 'EU Service Network','EE','services',0.87,3,'foreign' WHERE NOT EXISTS(SELECT 1 FROM suppliers WHERE name='EU Service Network');
