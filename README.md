@@ -16,9 +16,12 @@ Text-based business simulation game built with PHP.
 
 ## Administrator access
 
-Set `MYGAME_ADMIN_PASSWORD_HASH` in the web server environment before opening `/admin/`.
+For file based hosting, copy `config/admin.example.php` to `config/admin.local.php`
+on the server and replace the placeholder with a unique password of at least 12
+characters. This file is outside `public/` and ignored by Git. Do not publish it.
+You can alternatively set `MYGAME_ADMIN_PASSWORD_HASH` in the web server environment.
 Generate a hash with `php -r 'echo password_hash("your-secret", PASSWORD_DEFAULT), PHP_EOL;'`.
-When the variable is absent, administrator pages return HTTP 503 and cannot change game data.
+When neither credential is configured, administrator pages return HTTP 503.
 
 ## Existing inconsistent data
 
