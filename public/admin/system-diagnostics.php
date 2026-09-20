@@ -2,7 +2,7 @@
 declare(strict_types=1);session_start();require __DIR__.'/auth.php';
 spl_autoload_register(function(string $class):void{$prefix='MyGame\\';if(!str_starts_with($class,$prefix))return;$p=__DIR__.'/../../src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';if(is_file($p))require$p;});
 use MyGame\Infrastructure\Database\Connection;
-$error=null;$checks=[];$rows=[];$gameDate='—';$issues=[];$stats=[];
+$error=null;$checks=[];$rows=[];$gameDate='—';$issues=[];$stats=[];$salesReadiness=[];
 try{
  $db=Connection::make();$gameDate=(string)($db->query("SELECT game_date FROM game_clock WHERE id=1")->fetchColumn()?:'—');
  $tables=['companies','company_bank_accounts','company_inventory','sales_ledger','company_monthly_cycles','bank_account_transactions','company_employees','company_properties','company_utility_contracts'];
@@ -60,6 +60,27 @@ try{
  (SELECT COUNT(*) FROM company_utility_contracts u WHERE u.company_id=c.id AND u.is_active=1) utilities
  FROM companies c WHERE c.status='active'")->fetchAll();
  foreach($notReady as $x){if((int)$x['properties']===0||(int)$x['employees']===0||(int)$x['utilities']===0)$issues[]=['area'=>'Veiklos paruošimas','company'=>$x['name'],'period'=>'—','detail'=>'Patalpos: '.$x['properties'].' · darbuotojai: '.$x['employees'].' · komunalinės: '.$x['utilities'],'level'=>'warn'];}
+
+ // Pardavimų paleidimo diagnostika – parodo ne tik apskaitą, bet ir kodėl pardavimai gali būti 0.
+ $companyRows=$db->query("SELECT id,name,city,industry,status FROM companies WHERE status='active' ORDER BY company_type,name")->fetchAll();
+ $propertyByIndustry=['retail'=>'shop','logistics'=>'warehouse','manufacturing'=>'factory','services'=>'office'];
+ $rolesByIndustry=['retail'=>['seller'],'logistics'=>['driver','warehouse'],'manufacturing'=>['production','warehouse'],'services'=>['manager']];
+ $utilitiesByIndustry=['retail'=>['electricity','water'],'logistics'=>['electricity'],'manufacturing'=>['electricity','water'],'services'=>['electricity']];
+ $households=(float)($db->query("SELECT COALESCE(balance,0) FROM economy_sectors WHERE code='HOUSEHOLDS' LIMIT 1")->fetchColumn()?:0);
+ foreach($companyRows as $co){
+  $id=(int)$co['id'];$industry=(string)$co['industry'];$city=(string)$co['city'];
+  $propertyType=$propertyByIndustry[$industry]??'office';
+  $s=$db->prepare("SELECT COUNT(*) FROM company_properties WHERE company_id=? AND status='active' AND property_type=? AND city=?");$s->execute([$id,$propertyType,$city]);$propertyOk=(int)$s->fetchColumn()>0;
+  $roleCodes=$rolesByIndustry[$industry]??['manager'];$marks=implode(',',array_fill(0,count($roleCodes),'?'));
+  $s=$db->prepare("SELECT COUNT(*) FROM company_employees e JOIN job_roles r ON r.id=e.role_id WHERE e.company_id=? AND e.status='active' AND r.code IN ($marks)");$s->execute([$id,...$roleCodes]);$employeeOk=(int)$s->fetchColumn()>0;
+  $s=$db->prepare("SELECT utility_type FROM company_utility_contracts WHERE company_id=? AND is_active=1 AND monthly_usage>0");$s->execute([$id]);$activeUtilities=array_column($s->fetchAll(),'utility_type');
+  $requiredUtilities=$utilitiesByIndustry[$industry]??['electricity'];$missingUtilities=array_values(array_diff($requiredUtilities,$activeUtilities));$utilitiesOk=!$missingUtilities;
+  $s=$db->prepare("SELECT COALESCE(SUM(quantity),0) qty,COUNT(*) products,COALESCE(SUM(quantity*COALESCE(NULLIF(sale_price,0),0)),0) stock_value FROM company_inventory WHERE company_id=? AND quantity>0");$s->execute([$id]);$inv=$s->fetch()?:[];$stockQty=(float)($inv['qty']??0);$stockOk=$stockQty>0;
+  $s=$db->prepare("SELECT demand_index,purchasing_power FROM market_demand WHERE city=? AND industry=? LIMIT 1");$s->execute([$city,$industry]);$demand=$s->fetch()?:null;$demandOk=(bool)$demand;
+  $blockers=[];if(!$propertyOk)$blockers[]='nėra tinkamų patalpų tame pačiame mieste';if(!$employeeOk)$blockers[]='nėra operacinio darbuotojo';if(!$utilitiesOk)$blockers[]='trūksta komunalinių: '.implode(', ',$missingUtilities);if(!$stockOk)$blockers[]='nėra atsargų';if(!$demandOk)$blockers[]='nėra market_demand įrašo';if($households<=0)$blockers[]='HOUSEHOLDS sektorius neturi pinigų';
+  $salesReadiness[]=['name'=>$co['name'],'city'=>$city,'industry'=>$industry,'property'=>$propertyOk,'employee'=>$employeeOk,'utilities'=>$utilitiesOk,'missing_utilities'=>$missingUtilities,'stock'=>$stockOk,'stock_qty'=>$stockQty,'demand'=>$demandOk,'demand_index'=>(float)($demand['demand_index']??0),'purchasing_power'=>(float)($demand['purchasing_power']??0),'households'=>$households,'ready'=>!$blockers,'blockers'=>$blockers];
+  if($blockers)$issues[]=['area'=>'Pardavimų paleidimas','company'=>$co['name'],'period'=>'—','detail'=>implode('; ',$blockers),'level'=>'warn'];
+ }
 
  // Pardavimų neatitikimus perkeliam ir į bendrą problemų sąrašą
  foreach($rows as $x)if($x['level']!=='ok')$issues[]=['area'=>'Pardavimai','company'=>$x['name'],'period'=>$x['period'],'detail'=>'sales_ledger '.$x['ledger_revenue'].' € · ciklas '.$x['cycle_revenue'].' € · bankas '.$x['bank_revenue'].' €','level'=>'error'];
