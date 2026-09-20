@@ -1,2 +1,3 @@
 config/database.local.php
+config/admin.local.php
 .env
