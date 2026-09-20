@@ -20,7 +20,7 @@ try{
  $checks[]=['level'=>$neg?'error':'ok','title'=>'Neigiamos atsargos','detail'=>$neg?"Rasta: ".$neg:'Nerasta'];
  $orphan=(int)$db->query("SELECT COUNT(*) FROM sales_ledger s LEFT JOIN company_monthly_cycles m ON m.company_id=s.company_id AND m.period=s.period WHERE m.id IS NULL")->fetchColumn();
  $checks[]=['level'=>$orphan?'error':'ok','title'=>'Pardavimai be mėnesio ciklo','detail'=>$orphan?"Rasta: ".$orphan:'Nerasta'];
- $zero=(int)$db->query("SELECT COUNT(*) FROM company_monthly_cycles m WHERE m.revenue=0 AND EXISTS(SELECT 1 FROM sales_ledger s WHERE s.company_id=m.company_id AND s.period=periods.period AND s.revenue>0)")->fetchColumn();
+ $zero=(int)$db->query("SELECT COUNT(*) FROM company_monthly_cycles m WHERE m.revenue=0 AND EXISTS(SELECT 1 FROM sales_ledger s WHERE s.company_id=m.company_id AND s.period=m.period AND s.revenue>0)")->fetchColumn();
  $checks[]=['level'=>$zero?'error':'ok','title'=>'0 € ciklas su realiais pardavimais','detail'=>$zero?"Rasta: ".$zero:'Nerasta'];
 }catch(Throwable $e){$error=$e->getMessage();}
 require __DIR__.'/../../src/Presentation/admin/system-diagnostics.php';
