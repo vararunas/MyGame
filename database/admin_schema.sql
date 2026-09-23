@@ -701,3 +701,33 @@ ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS registered_address VA
 ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS manager_name VARCHAR(120) NULL AFTER registered_address;
 ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS share_capital DECIMAL(16,2) NOT NULL DEFAULT 0 AFTER manager_name;
 ALTER TABLE company_registrations ADD COLUMN IF NOT EXISTS incorporation_fee DECIMAL(14,2) NOT NULL DEFAULT 0 AFTER share_capital;
+
+
+-- CITY CONSUMER MARKET V1: population-driven retail demand
+ALTER TABLE products ADD COLUMN IF NOT EXISTS monthly_demand_per_1000 DECIMAL(10,2) NOT NULL DEFAULT 20.00 AFTER price_elasticity;
+
+-- Approximate game consumption frequencies per 1,000 residents / month.
+UPDATE products SET monthly_demand_per_1000=120 WHERE sku='RET-101';
+UPDATE products SET monthly_demand_per_1000=25 WHERE sku='RET-102';
+UPDATE products SET monthly_demand_per_1000=18 WHERE sku='RET-103';
+UPDATE products SET monthly_demand_per_1000=25 WHERE sku='RET-104';
+UPDATE products SET monthly_demand_per_1000=40 WHERE sku='RET-105';
+UPDATE products SET monthly_demand_per_1000=18 WHERE sku='RET-001';
+
+CREATE TABLE IF NOT EXISTS city_product_market_snapshots (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ period CHAR(7) NOT NULL,
+ city VARCHAR(100) NOT NULL,
+ product_id BIGINT UNSIGNED NOT NULL,
+ population INT UNSIGNED NOT NULL DEFAULT 0,
+ base_demand_units DECIMAL(16,2) NOT NULL DEFAULT 0,
+ effective_demand_units DECIMAL(16,2) NOT NULL DEFAULT 0,
+ total_supply_units DECIMAL(16,2) NOT NULL DEFAULT 0,
+ average_market_price DECIMAL(14,2) NOT NULL DEFAULT 0,
+ sold_units DECIMAL(16,2) NOT NULL DEFAULT 0,
+ revenue DECIMAL(18,2) NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY uq_city_product_market(period,city,product_id),
+ CONSTRAINT fk_city_product_market_product FOREIGN KEY(product_id) REFERENCES products(id),
+ INDEX idx_city_product_market_city(period,city)
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
