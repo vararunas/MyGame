@@ -17,7 +17,7 @@ final class AiCompanyEngine{
    if(!$exists)$this->ensureBank($id,(float)($this->one('SELECT starting_capital FROM companies WHERE id=?',[$id])['starting_capital']??0));
    if(($this->one('SELECT status FROM companies WHERE id=?',[$id])['status']??'')!=='active')continue;
    $this->ensureEmployees($id,(int)$x[4]);
-   $this->ensureAccountant($id);
+   // Buhalteris samdomas tik tada, kai įmonė gali išlaikyti papildomą etatą.
    // Atsargos perkamos už realias lėšas, nebedovanojamos kiekvieno seed() metu.
    $this->ensureOperations($id,(string)$x[1],(string)$x[2]);
    $this->syncEmployment($id);
@@ -28,10 +28,31 @@ final class AiCompanyEngine{
   foreach($s as $c){
    $id=(int)$c['id'];$profit=(float)$c['monthly_profit'];$q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cash=(float)$q->fetchColumn();$months=$profit<0?(int)$c['months_in_loss']+1:0;$target=(int)$c['target_employees'];
    if($profit>2500&&$c['strategy']==='growth')$target++;if(($profit<0||$cash<5000)&&$target>1)$target--;
-   $this->resizeEmployees($id,$target);$this->ensureAccountant($id);$this->syncEmployment($id);
+   $this->resizeEmployees($id,$target);$this->syncEmployment($id);
    $q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cashAfter=(float)$q->fetchColumn();
    $this->pdo->prepare('UPDATE ai_company_profiles SET target_employees=?,months_in_loss=? WHERE company_id=?')->execute([$target,$months,$id]);
-   if($cashAfter<=0&&$months>=6)$this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=?")->execute([$id]);
+   $stock=(float)($this->one('SELECT COALESCE(SUM(quantity*average_cost),0) v FROM company_inventory WHERE company_id=?',[$id])['v']??0);
+   if($months>=3&&$cashAfter<1500&&$stock<100)$this->closeBankrupt($id);
+
+  }
+  $this->spawnOneReplacement();
+ }
+ private function closeBankrupt(int $id):void{
+  $this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=? AND company_type='ai' AND status='active'")->execute([$id]);
+  $this->pdo->prepare("UPDATE company_employees SET status='dismissed' WHERE company_id=? AND status='active'")->execute([$id]);
+  $this->pdo->prepare("UPDATE company_properties SET status='terminated' WHERE company_id=? AND status='active'")->execute([$id]);
+  $this->pdo->prepare('UPDATE property_market pm JOIN company_properties cp ON cp.market_property_id=pm.id SET pm.is_available=1 WHERE cp.company_id=?')->execute([$id]);
+  $this->pdo->prepare('UPDATE company_utility_contracts SET is_active=0 WHERE company_id=?')->execute([$id]);
+  $this->syncEmployment($id);
+ }
+ private function spawnOneReplacement():void{
+  $date=(string)$this->pdo->query('SELECT game_date FROM game_clock WHERE id=1')->fetchColumn();$period=substr($date,0,7);
+  $already=$this->one("SELECT id FROM companies WHERE company_type='ai' AND name LIKE ? LIMIT 1",['Nauja AI % · '.$period]);if($already)return;
+  $markets=$this->pdo->query("SELECT city,industry,population,demand_index,purchasing_power FROM market_demand WHERE population>0 ORDER BY population DESC")->fetchAll();
+  foreach($markets as $m){$city=(string)$m['city'];$industry=(string)$m['industry'];$active=(int)($this->one("SELECT COUNT(*) n FROM companies WHERE company_type='ai' AND status='active' AND city=? AND industry=?",[$city,$industry])['n']??0);if($active>=1)continue;
+   $closed=(int)($this->one("SELECT COUNT(*) n FROM companies WHERE company_type='ai' AND status='bankrupt' AND city=? AND industry=?",[$city,$industry])['n']??0);if($closed===0)continue;
+   $country=(int)$this->pdo->query("SELECT id FROM countries WHERE code='LT' LIMIT 1")->fetchColumn();$capital=45000.;$name='Nauja AI '.$city.' '.$industry.' · '.$period;
+   $this->pdo->prepare("INSERT INTO companies(country_id,name,city,industry,starting_capital,company_type,status,cash,assets) VALUES(?,?,?,?,?,'ai','active',?,?)")->execute([$country,$name,$city,$industry,$capital,$capital,$capital]);$id=(int)$this->pdo->lastInsertId();$this->pdo->prepare("INSERT INTO ai_company_profiles(company_id,strategy,target_employees) VALUES(?,'balanced',1)")->execute([$id]);$this->pdo->prepare('INSERT INTO company_employment(company_id) VALUES(?)')->execute([$id]);$this->pdo->prepare('INSERT INTO company_trade_profiles(company_id,import_enabled,export_enabled) VALUES(?,1,1)')->execute([$id]);$this->ensureBank($id,$capital);$this->resizeEmployees($id,1);$this->ensureOperations($id,$city,$industry);$this->syncEmployment($id);$this->restock($id,$industry,$capital);break;
   }
  }
  private function ensureBank(int $id,float $capital):void{
