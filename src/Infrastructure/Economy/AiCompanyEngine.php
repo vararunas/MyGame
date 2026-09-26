@@ -9,15 +9,16 @@ final class AiCompanyEngine{
   $rows=[['Baltic Retail','Vilnius','retail','growth',6],['Kauno Prekyba','Kaunas','retail','balanced',4],['Transa LT','Kaunas','logistics','growth',8],['Klaipėdos Logistika','Klaipėda','logistics','balanced',7],['Nord Gamyba','Šiauliai','manufacturing','cautious',10],['Aukštaitijos Gamyba','Panevėžys','manufacturing','balanced',8],['Miesto Paslaugos','Vilnius','services','growth',5],['Verslo Servisas','Kaunas','services','cautious',3]];
   foreach($rows as $x){
    $exists=$this->one('SELECT id FROM companies WHERE name=?',[$x[0]]);
-   if($exists){$id=(int)$exists['id'];$current=$this->one('SELECT company_type FROM companies WHERE id=?',[$id]);if(($current['company_type']??'')!=='ai')throw new \RuntimeException('AI įmonės pavadinimas jau naudojamas žaidėjo.');$bank=(float)($this->one('SELECT COALESCE(SUM(balance),0) b FROM company_bank_accounts WHERE company_id=? AND is_active=1',[$id])['b']??0);if($bank>0){$this->pdo->prepare("UPDATE companies SET status='active' WHERE id=? AND company_type='ai' AND status='bankrupt'")->execute([$id]);$this->pdo->prepare("UPDATE ai_company_profiles SET months_in_loss=0 WHERE company_id=?")->execute([$id]);}}
+   if($exists){$id=(int)$exists['id'];$current=$this->one('SELECT company_type FROM companies WHERE id=?',[$id]);if(($current['company_type']??'')!=='ai')throw new \RuntimeException('AI įmonės pavadinimas jau naudojamas žaidėjo.');$bank=(float)($this->one('SELECT COALESCE(SUM(balance),0) b FROM company_bank_accounts WHERE company_id=? AND is_active=1',[$id])['b']??0);/* Bankrotavusios įmonės automatiškai neatkuriamos. */}
    else{$capital=25000+$x[4]*4000;$s=$this->pdo->prepare("INSERT INTO companies(country_id,name,city,industry,starting_capital,company_type,status,cash,assets) VALUES(?,?,?,?,?,'ai','active',?,?)");$s->execute([$country,$x[0],$x[1],$x[2],$capital,$capital,$capital]);$id=(int)$this->pdo->lastInsertId();}
    $this->pdo->prepare('INSERT INTO company_employment(company_id) VALUES(?) ON DUPLICATE KEY UPDATE company_id=VALUES(company_id)')->execute([$id]);
    $this->pdo->prepare('INSERT INTO company_trade_profiles(company_id,import_enabled,export_enabled) VALUES(?,1,1) ON DUPLICATE KEY UPDATE import_enabled=1,export_enabled=1')->execute([$id]);
    $this->pdo->prepare('INSERT INTO ai_company_profiles(company_id,strategy,target_employees) VALUES(?,?,?) ON DUPLICATE KEY UPDATE strategy=VALUES(strategy)')->execute([$id,$x[3],$x[4]]);
-   $this->ensureBank($id,(float)($this->one('SELECT starting_capital FROM companies WHERE id=?',[$id])['starting_capital']??0));
+   if(!$exists)$this->ensureBank($id,(float)($this->one('SELECT starting_capital FROM companies WHERE id=?',[$id])['starting_capital']??0));
+   if(($this->one('SELECT status FROM companies WHERE id=?',[$id])['status']??'')!=='active')continue;
    $this->ensureEmployees($id,(int)$x[4]);
    $this->ensureAccountant($id);
-   $this->ensureInventory($id,(string)$x[2]);
+   // Atsargos perkamos už realias lėšas, nebedovanojamos kiekvieno seed() metu.
    $this->ensureOperations($id,(string)$x[1],(string)$x[2]);
    $this->syncEmployment($id);
   }
@@ -27,7 +28,7 @@ final class AiCompanyEngine{
   foreach($s as $c){
    $id=(int)$c['id'];$profit=(float)$c['monthly_profit'];$q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cash=(float)$q->fetchColumn();$months=$profit<0?(int)$c['months_in_loss']+1:0;$target=(int)$c['target_employees'];
    if($profit>2500&&$c['strategy']==='growth')$target++;if(($profit<0||$cash<5000)&&$target>1)$target--;
-   $this->resizeEmployees($id,$target);$this->ensureAccountant($id);$this->restock($id,(string)$c['industry'],$cash);$this->syncEmployment($id);
+   $this->resizeEmployees($id,$target);$this->ensureAccountant($id);$this->syncEmployment($id);
    $q=$this->pdo->prepare('SELECT COALESCE(SUM(balance),0) FROM company_bank_accounts WHERE company_id=? AND is_active=1');$q->execute([$id]);$cashAfter=(float)$q->fetchColumn();
    $this->pdo->prepare('UPDATE ai_company_profiles SET target_employees=?,months_in_loss=? WHERE company_id=?')->execute([$target,$months,$id]);
    if($cashAfter<=0&&$months>=6)$this->pdo->prepare("UPDATE companies SET status='bankrupt' WHERE id=?")->execute([$id]);
@@ -51,6 +52,9 @@ final class AiCompanyEngine{
   while($current<$target){$date=(string)$this->pdo->query('SELECT game_date FROM game_clock WHERE id=1')->fetchColumn();$this->pdo->prepare("INSERT INTO company_employees(company_id,role_id,full_name,salary,skill,status,hired_at) VALUES(?,?,?,?,70,'active',?)")->execute([$id,$role,'AI darbuotojas '.($current+1),$salary,$date]);$current++;}
   while($current>$target){$e=$this->one("SELECT e.id FROM company_employees e JOIN job_roles r ON r.id=e.role_id WHERE e.company_id=? AND e.status='active' AND (r.automation_type IS NULL OR r.automation_type<>'accounting') ORDER BY e.id DESC LIMIT 1",[$id]);if(!$e)break;$this->pdo->prepare("UPDATE company_employees SET status='dismissed' WHERE id=?")->execute([$e['id']]);$current--;}
  }
+ public function prepareTrading():void{
+  $this->seed();$s=$this->pdo->query("SELECT c.id,c.industry FROM companies c WHERE c.company_type='ai' AND c.status='active'");foreach($s as $c){$id=(int)$c['id'];$cash=(float)($this->one('SELECT COALESCE(balance,0) balance FROM company_bank_accounts WHERE company_id=? AND is_primary=1 AND is_active=1',[$id])['balance']??0);$this->restock($id,(string)$c['industry'],$cash);}
+ }
  private function ensureInventory(int $id,string $industry):void{
   $p=$this->one('SELECT * FROM products WHERE industry=? ORDER BY id LIMIT 1',[$industry]);if(!$p)return;
   $inv=$this->one('SELECT quantity FROM company_inventory WHERE company_id=? AND product_id=?',[$id,$p['id']]);if($inv)return;
@@ -71,7 +75,7 @@ final class AiCompanyEngine{
   $products=$this->pdo->prepare('SELECT p.*,COALESCE(i.quantity,0) qty,COALESCE(i.sale_price,0) sale_price,COALESCE(i.average_cost,p.base_cost) average_cost FROM products p LEFT JOIN company_inventory i ON i.product_id=p.id AND i.company_id=? WHERE p.industry=? ORDER BY p.demand_weight DESC,p.id');$products->execute([$id,$industry]);$flow=new MoneyFlowService($this->pdo);$budget=max(0,$cash*.30);
   foreach($products as $p){if($budget<=0)break;$stock=(float)$p['qty'];$target=$industry==='retail'?max(60,min(350,round((float)($p['monthly_demand_per_1000']??20)*2.5))):120;if($stock>=$target*.55)continue;$qty=max(0,$target-$stock);$unit=(float)$p['base_cost'];$cost=round($qty*$unit,2);if($cost<=0||$cost>$budget){$qty=floor($budget/max(.01,$unit));$cost=round($qty*$unit,2);}if($qty<=0||$cost<=0)continue;
    $market=$this->one("SELECT AVG(i.sale_price) avg_price FROM company_inventory i JOIN companies c ON c.id=i.company_id WHERE c.city=? AND c.industry=? AND c.status='active' AND i.product_id=? AND i.quantity>0 AND i.sale_price>0",[$city,$industry,$p['id']]);$marketPrice=(float)($market['avg_price']??0);$floor=$unit*1.12;$anchor=$marketPrice>0?$marketPrice:(float)$p['base_price'];$mult=$strategy==='growth'?.97:($strategy==='cautious'?1.04:1.00);$sale=round(max($floor,$anchor*$mult),2);
-   $own=!$this->pdo->inTransaction();try{if($own)$this->pdo->beginTransaction();$flow->companyToSector($id,'DOMESTIC_BUSINESS',$cost,'supplier_payment','AI atsargų papildymas · '.$p['name']);$old=(float)$p['qty'];$avg=(float)$p['average_cost'];$new=$old+$qty;$newAvg=(($old*$avg)+$cost)/max(.01,$new);$this->pdo->prepare('INSERT INTO company_inventory(company_id,product_id,quantity,average_cost,sale_price) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE quantity=VALUES(quantity),average_cost=VALUES(average_cost),sale_price=VALUES(sale_price)')->execute([$id,$p['id'],$new,$newAvg,$sale]);if($own)$this->pdo->commit();$budget-=$cost;}catch(\Throwable$e){if($own&&$this->pdo->inTransaction())$this->pdo->rollBack();break;}
+   $own=!$this->pdo->inTransaction();try{if($own)$this->pdo->beginTransaction();$flow->companyToSector($id,'DOMESTIC_BUSINESS',$cost,'supplier_payment','AI atsargų papildymas · '.$p['name']);$old=(float)$p['qty'];$avg=(float)$p['average_cost'];$new=$old+$qty;$newAvg=(($old*$avg)+$cost)/max(.01,$new);$this->pdo->prepare('INSERT INTO company_inventory(company_id,product_id,quantity,average_cost,sale_price) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE quantity=VALUES(quantity),average_cost=VALUES(average_cost),sale_price=VALUES(sale_price)')->execute([$id,$p['id'],$new,$newAvg,$sale]);if($own)$this->pdo->commit();$budget-=$cost;}catch(\Throwable$e){if($own&&$this->pdo->inTransaction())$this->pdo->rollBack();throw new \RuntimeException('AI atsargų papildymas nepavyko (įmonė #'.$id.', prekė #'.$p['id'].'): '.$e->getMessage(),0,$e);}
   }
  }
  private function syncEmployment(int $id):void{$x=$this->one("SELECT COUNT(*) c,COALESCE(AVG(salary),0) a FROM company_employees WHERE company_id=? AND status='active'",[$id]);$this->pdo->prepare('INSERT INTO company_employment(company_id,employees,average_salary) VALUES(?,?,?) ON DUPLICATE KEY UPDATE employees=VALUES(employees),average_salary=VALUES(average_salary)')->execute([$id,$x['c'],$x['a']]);}
